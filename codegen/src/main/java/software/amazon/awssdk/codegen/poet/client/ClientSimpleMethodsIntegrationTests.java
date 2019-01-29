@@ -26,6 +26,7 @@ import software.amazon.awssdk.codegen.model.intermediate.OperationModel;
 import software.amazon.awssdk.codegen.poet.ClassSpec;
 import software.amazon.awssdk.codegen.poet.PoetExtensions;
 import software.amazon.awssdk.codegen.poet.PoetUtils;
+import software.amazon.awssdk.core.exception.SdkException;
 import software.amazon.awssdk.regions.Region;
 
 public class ClientSimpleMethodsIntegrationTests implements ClassSpec {
@@ -104,7 +105,12 @@ public class ClientSimpleMethodsIntegrationTests implements ClassSpec {
                          .addAnnotation(testClass)
                          .addException(Exception.class)
                          .addModifiers(Modifier.PUBLIC)
-                         .addStatement("client.$N()", opModel.getMethodName())
+                         .addCode("try {")
+                         .addCode("    client.$N();", opModel.getMethodName())
+                         .addCode("    throw new $T(\"Should fail.\");", AssertionError.class)
+                         .addCode("} catch ($T e) {", SdkException.class)
+                         .addCode("}")
+//                         .addStatement("client.$N()", opModel.getMethodName())
                          .build();
     }
 }
