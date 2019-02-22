@@ -14,13 +14,13 @@ public interface DynamoDb {
      * Create a low-level Dynamo DB client with default configuration. Equivalent to DynamoDbClient.create().
      * Already GA in module software.amazon.awssdk:dynamodb.
      */
-    public DynamoDbClient client();
+    DynamoDbClient client();
 
     /**
      * Create a low-level Dynamo DB client builder. Equivalent to DynamoDbClient.builder().
      * Already GA in module software.amazon.awssdk:dynamodb.
      */
-    public DynamoDbClientBuilder clientBuilder();
+    DynamoDbClientBuilder clientBuilder();
 
     /**
      * Create a high-level "document" Dynamo DB client with default configuration. See below for API.
@@ -30,7 +30,7 @@ public interface DynamoDb {
      *     TODO
      * </code>
      */
-    public DynamoDbDocumentClient documentClient();
+    DynamoDbDocumentClient documentClient();
 
     /**
      * Create a high-level "document" Dynamo DB client builder. See below for API.
@@ -40,7 +40,7 @@ public interface DynamoDb {
      *     TODO
      * </code>
      */
-    public DynamoDbDocumentClient.Builder documentClientBuilder();
+    DynamoDbDocumentClient.Builder documentClientBuilder();
 }
 
 public interface DynamoDbDocumentClient extends SdkAutoCloseable {
@@ -54,27 +54,27 @@ public interface DynamoDbDocumentClient extends SdkAutoCloseable {
      *     <li>DynamoDbDocumentClient.builder().build()</li>
      * </ol>
      */
-    public static DynamoDbDocumentClient create();
+    static DynamoDbDocumentClient create();
 
     /**
      * Create a {@link DynamoDbDocumentClient.Builder}.
      */
-    public static DynamoDbDocumentClient.Builder builder();
+    static DynamoDbDocumentClient.Builder builder();
 
     /**
      * Get a specific Dynamo DB table, based on its table name.
      */
-    public static DynamoDbTable createTable(CreateTableRequest createTableRequest);
+    static DynamoDbTable createTable(CreateTableRequest createTableRequest);
 
     /**
      * Get a specific Dynamo DB table, based on its table name.
      */
-    public static DynamoDbTable getTable(String tableName);
+    static DynamoDbTable getTable(String tableName);
 
     /**
      * Get a lazily-populated iterable over all Dynamo DB tables on the current account and region.
      */
-    public static ListTablesResponse listTables();
+    static ListTablesResponse listTables();
 
     /**
      * The builder for the high-level Dynamo DB client. This is used by customers to configure the high-level client with default
@@ -82,22 +82,22 @@ public interface DynamoDbDocumentClient extends SdkAutoCloseable {
      *
      * This can be created via {@link DynamoDb#documentClientBuilder()} or {@link DynamoDbDocumentClient#builder()}.
      */
-    public interface Builder {
+    interface Builder {
         /**
          * Configure the Dynamo DB document client with a low-level Dynamo Db client. This is the only required configuration.
          */
-        public DynamoDbDocumentClient.Builder dynamoDbClient(DynamoDbClient client);
+        DynamoDbDocumentClient.Builder dynamoDbClient(DynamoDbClient client);
 
         /**
          * Configure the Dynamo DB document client with a specific set of configuration values that override the defaults.
          */
-        public DynamoDbDocumentClient.Builder documentOverrideConfiguration(DocumentClientConfiguration configuration);
-        public DynamoDbDocumentClient.Builder documentOverrideConfiguration(Consumer<DocumentClientConfiguration.Builder> configuration);
+        DynamoDbDocumentClient.Builder documentOverrideConfiguration(DocumentClientConfiguration configuration);
+        DynamoDbDocumentClient.Builder documentOverrideConfiguration(Consumer<DocumentClientConfiguration.Builder> configuration);
 
         /**
          * Create a Dynamo DB document client with all of the configured values.
          */
-        public DynamoDbDocumentClient build();
+        DynamoDbDocumentClient build();
     }
 }
 
@@ -110,18 +110,27 @@ public interface DocumentClientConfiguration {
          */
         DocumentClientConfiguration.Builder tableMetadataCacheTimeToLive(Duration tableMetadataCacheTimeToLive);
 
-        DocumentClientConfiguration.Builder itemAttributeValueConverters(List<ItemAttributeValueConverter<?>> converters);
-        DocumentClientConfiguration.Builder addItemAttributeValueConverter(ItemAttributeValueConverter<?> converter);
-        DocumentClientConfiguration.Builder clearItemAttributeValueConverters();
+        DocumentClientConfiguration.Builder converters(List<ItemAttributeValueConverter<?>> converters);
+        DocumentClientConfiguration.Builder addConverter(ItemAttributeValueConverter<?> converter);
+        DocumentClientConfiguration.Builder clearConverters();
 
         DocumentClientConfiguration build();
     }
 }
 
 public interface ItemAttributeValueConverter<T> {
-    public Class<T> convertedClass();
-    public ItemAttributeValue toAttributeValue(T input);
-    public T fromAttributeValue(ItemAttributeValue input);
+    ConversionCondition defaultConversionCondition();
+    ItemAttributeValue toAttributeValue(T input, ConversionContext context);
+    T fromAttributeValue(ItemAttributeValue input, ConversionContext context);
+}
+
+public interface ConversionCondition {
+    static ConversionCondition isInstanceOf(Class<?> clazz);
+    static ConversionCondition never();
+}
+
+public interface ConversionContext {
+
 }
 
 public interface ListTablesResponse {
@@ -177,6 +186,17 @@ public interface PutResponse {
     PutItemResponse rawResponse();
 }
 
+public interface ItemSchema {
+    static ItemSchema.Builder builder();
+
+    interface Builder {
+        ItemSchema.Builder attributeSchemas(List<AttributeSchema> attributeSchemas);
+        ItemSchema.Builder converter(ItemAttributeValueConverter<?> converter);
+
+        ItemSchema build();
+    }
+}
+
 public interface Item {
     static Item.Builder builder();
 
@@ -185,9 +205,11 @@ public interface Item {
 
     interface Builder {
         Item.Builder putAttribute(String attributeKey, ItemAttributeValue attributeValue);
-        Item.Builder putAttribute(String attributeKey, Object unconvertedAttributeValue);
+        Item.Builder putAttribute(String attributeKey, ItemAttributeValue attributeValue, ItemAttributeValueConverter<?> converter);
         Item.Builder removeAttribute(String attributeKey);
         Item.Builder clearAttributes();
+
+        Item.Builder converter(ItemAttributeValueConverter<?> converter);
 
         Item build();
     }
