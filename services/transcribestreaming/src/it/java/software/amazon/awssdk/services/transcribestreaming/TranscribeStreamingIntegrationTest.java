@@ -23,8 +23,12 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.ByteBuffer;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -39,6 +43,8 @@ import org.reactivestreams.Subscription;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.core.SdkBytes;
+import software.amazon.awssdk.http.nio.netty.NettyNioAsyncHttpClient;
+import software.amazon.awssdk.http.nio.netty.SdkEventLoopGroup;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.transcribestreaming.model.AudioEvent;
 import software.amazon.awssdk.services.transcribestreaming.model.AudioStream;
@@ -62,6 +68,11 @@ public class TranscribeStreamingIntegrationTest {
     @BeforeClass
     public static void setup() throws URISyntaxException {
         client = TranscribeStreamingAsyncClient.builder()
+                                               .httpClientBuilder(NettyNioAsyncHttpClient
+                                                       .builder()
+                                                       .connectionTimeout(Duration.ofSeconds(120))
+                                                       .eventLoopGroupBuilder(SdkEventLoopGroup.builder()))
+                                                .endpointOverride(URI.create("http://10.255.255.1"))
                                                .region(Region.US_EAST_1)
                                                .credentialsProvider(getCredentials())
                                                .build();
@@ -69,13 +80,37 @@ public class TranscribeStreamingIntegrationTest {
 
     @Test
     public void testFileWith16kRate() throws ExecutionException, InterruptedException, URISyntaxException {
-        CompletableFuture<Void> result = client.startStreamTranscription(getRequest(16_000),
-                                                                         new AudioStreamPublisher(
-                                                                             getInputStream("silence_16kHz_s16le.wav")),
-                                                                         getResponseHandler());
+        List<CompletableFuture<?>> futures = new ArrayList<>(100);
+        for (int i = 0; i < 100; ++i) {
+            CompletableFuture<Void> result =
+                    client.startStreamTranscription(getRequest(16_000),
+                            new AudioStreamPublisher(
+                                    getInputStream("silence_16kHz_s16le.wav")),
+                            getResponseHandler());
+            futures.add(result);
+        }
 
+//        System.out.println("Sleeping for a bit");
+//        Thread.sleep(3_000);
+
+//        System.out.println("Cancelling futures");
+//        for (CompletableFuture<?> cf : futures) {
+//            cf.cancel(true);
+//        }
+        // client.close();
+
+        // result.cancel(true);
+
+        System.out.println("Sleeping");
+        Thread.sleep(8_000);
         // Blocking call to keep the main thread for shutting down
-        result.get();
+        //result.get();
+
+        System.out.println("Forcing GC");
+        Runtime.getRuntime().gc();
+
+        Thread.sleep(120_000);
+
     }
 
     @Test
@@ -120,7 +155,7 @@ public class TranscribeStreamingIntegrationTest {
                                                           System.out.println("Received Initial response: " + idFromHeader);
                                                       })
                                                       .onError(e -> {
-                                                          System.out.println("Error message: " + e.getMessage());
+//                                                          System.out.println("Error message: " + e.getMessage());
                                                       })
                                                       .onComplete(() -> {
                                                           System.out.println("All records stream successfully");

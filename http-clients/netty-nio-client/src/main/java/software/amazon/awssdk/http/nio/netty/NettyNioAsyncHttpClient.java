@@ -129,7 +129,7 @@ public final class NettyNioAsyncHttpClient implements SdkAsyncHttpClient {
 
     private RequestContext createRequestContext(AsyncExecuteRequest request) {
         ChannelPool pool = pools.get(poolKey(request.request()));
-        return new RequestContext(pool, request, configuration);
+        return new RequestContext(pool, sdkEventLoopGroup.eventLoopGroup(), request, configuration);
     }
 
     private SdkEventLoopGroup eventLoopGroup(DefaultBuilder builder) {

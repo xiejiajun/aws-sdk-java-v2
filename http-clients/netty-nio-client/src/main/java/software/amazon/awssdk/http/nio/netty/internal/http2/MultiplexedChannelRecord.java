@@ -17,9 +17,7 @@ package software.amazon.awssdk.http.nio.netty.internal.http2;
 
 import static software.amazon.awssdk.http.nio.netty.internal.ChannelAttributeKey.CHANNEL_POOL_RECORD;
 import static software.amazon.awssdk.http.nio.netty.internal.ChannelAttributeKey.PROTOCOL_FUTURE;
-import static software.amazon.awssdk.http.nio.netty.internal.utils.NettyUtils.asyncPromiseNotifyingBiConsumer;
 import static software.amazon.awssdk.http.nio.netty.internal.utils.NettyUtils.doInEventLoop;
-import static software.amazon.awssdk.http.nio.netty.internal.utils.NettyUtils.promiseNotifyingListener;
 import static software.amazon.awssdk.utils.NumericUtils.saturatedCast;
 
 import io.netty.channel.Channel;
@@ -29,6 +27,7 @@ import io.netty.handler.codec.http2.Http2StreamChannel;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
 import io.netty.util.concurrent.Promise;
+
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
@@ -89,7 +88,7 @@ public final class MultiplexedChannelRecord {
                     connection.attr(CHANNEL_POOL_RECORD).set(this);
                     createChildChannel(channelPromise, connection);
                 } else {
-                    channelPromise.setFailure(future.cause());
+                    channelPromise.tryFailure(future.cause());
                     channelReleaser.accept(connection, this);
                 }
             });
@@ -123,7 +122,13 @@ public final class MultiplexedChannelRecord {
     private void createChildChannel0(Promise<Channel> channelPromise, Channel parentChannel) {
         // Once protocol future is notified then parent pipeline is configured and ready to go
         parentChannel.attr(PROTOCOL_FUTURE).get()
-                     .whenComplete(asyncPromiseNotifyingBiConsumer(bootstrapChildChannel(parentChannel), channelPromise));
+                .whenComplete((protocol, error) -> {
+                    if (error != null) {
+                        channelPromise.tryFailure(error);
+                    } else {
+                        bootstrapChildChannel(parentChannel).accept(protocol, channelPromise);
+                    }
+                });
     }
 
     /**
@@ -133,7 +138,7 @@ public final class MultiplexedChannelRecord {
      * @return BiConsumer that will bootstrap the child channel.
      */
     private BiConsumer<Protocol, Promise<Channel>> bootstrapChildChannel(Channel parentChannel) {
-        return (s, p) -> new ForkedHttp2StreamChannelBootstrap(parentChannel)
+        return (s, channelPromise) -> new ForkedHttp2StreamChannelBootstrap(parentChannel)
             .open()
             .addListener((GenericFutureListener<Future<Http2StreamChannel>>) future -> {
                 if (future.isSuccess()) {
@@ -146,7 +151,17 @@ public final class MultiplexedChannelRecord {
                     availableStreams.incrementAndGet();
                 }
             })
-            .addListener(promiseNotifyingListener(p));
+            .addListener((Future<Channel> f) -> {
+                if (f.isSuccess()) {
+                    Channel ch = f.getNow();
+                    if (!channelPromise.trySuccess(ch)) {
+                        // Promise was already completed. Discard this channel
+                        ch.close().addListener(closeFuture -> childChannels.remove(ch.id()));
+                    }
+                } else {
+                    channelPromise.tryFailure(f.cause());
+                }
+            });
     }
 
     void release(Channel channel) {
