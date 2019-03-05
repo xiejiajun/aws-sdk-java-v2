@@ -117,7 +117,7 @@ public final class NettyRequestExecutor {
                         }
                     });
                 } catch (Throwable exc) {
-                    log.debug("Unable to submit Runnable to channel EventLoop", exc);
+                    log.warn("Unable to add a task to cancel the request to channel's EventLoop", exc);
                 }
             }
         });
