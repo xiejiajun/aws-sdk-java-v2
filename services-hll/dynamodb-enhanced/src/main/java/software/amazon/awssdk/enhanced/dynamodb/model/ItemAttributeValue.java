@@ -1,93 +1,254 @@
 package software.amazon.awssdk.enhanced.dynamodb.model;
 
-import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import software.amazon.awssdk.annotations.ThreadSafe;
 import software.amazon.awssdk.core.SdkBytes;
-import software.amazon.awssdk.enhanced.dynamodb.converter.ItemAttributeValueConverter;
+import software.amazon.awssdk.utils.Validate;
 
 @ThreadSafe
 public class ItemAttributeValue {
-    public static ItemAttributeValue from(Object object) {
-        throw new UnsupportedOperationException();
-    }
-    public static ItemAttributeValue from(Object object, ItemAttributeValueConverter<?> converter) {
-        throw new UnsupportedOperationException();
+    private final ItemAttributeValueType type;
+    private final boolean isNull;
+    private final Item itemValue;
+    private final String stringValue;
+    private final String numberValue;
+    private final SdkBytes bytesValue;
+    private final Boolean booleanValue;
+    private final List<String> listOfStringsValue;
+    private final List<String> listOfNumbersValue;
+    private final List<SdkBytes> listOfBytesValue;
+    private final List<ItemAttributeValue> listOfAttributeValuesValue;
+
+    private ItemAttributeValue(InternalBuilder builder) {
+        this.type = builder.type;
+        this.isNull = builder.isNull;
+        this.itemValue = builder.itemValue;
+        this.stringValue = builder.stringValue;
+        this.numberValue = builder.numberValue;
+        this.bytesValue = builder.bytesValue;
+        this.booleanValue = builder.booleanValue;
+
+        this.listOfStringsValue = builder.listOfStringsValue == null
+                                  ? null
+                                  : Collections.unmodifiableList(new ArrayList<>(builder.listOfStringsValue));
+        this.listOfNumbersValue = builder.listOfNumbersValue == null
+                                  ? null
+                                  : Collections.unmodifiableList(new ArrayList<>(builder.listOfNumbersValue));
+        this.listOfBytesValue = builder.listOfBytesValue == null
+                                ? null
+                                : Collections.unmodifiableList(new ArrayList<>(builder.listOfBytesValue));
+        this.listOfAttributeValuesValue = builder.listOfAttributeValuesValue == null
+                                          ? null
+                                          : Collections.unmodifiableList(new ArrayList<>(builder.listOfAttributeValuesValue));
     }
 
-    <T> T as(Class<T> type) {
-        throw new UnsupportedOperationException();
-    }
-    ItemAttributeValueType type() {
-        throw new UnsupportedOperationException();
+    public static ItemAttributeValue nullValue() {
+        return new InternalBuilder().isNull().build();
     }
 
-    boolean isItem() {
-        throw new UnsupportedOperationException();
-    }
-    boolean isString() {
-        throw new UnsupportedOperationException();
-    }
-    boolean isNumber() {
-        throw new UnsupportedOperationException();
-    }
-    boolean isBytes() {
-        throw new UnsupportedOperationException();
-    }
-    boolean isBoolean() {
-        throw new UnsupportedOperationException();
-    }
-    boolean isListOfStrings() {
-        throw new UnsupportedOperationException();
-    }
-    boolean isListOfNumbers() {
-        throw new UnsupportedOperationException();
-    }
-    boolean isListOfBytes() {
-        throw new UnsupportedOperationException();
-    }
-    boolean isListOfAttributeValues() {
-        throw new UnsupportedOperationException();
-    }
-    boolean isNull() {
-        throw new UnsupportedOperationException();
+    public static ItemAttributeValue fromItem(Item itemValue) {
+        return new InternalBuilder().itemValue(itemValue).build();
     }
 
-    Item asItem() {
-        throw new UnsupportedOperationException();
-    }
-    String asString() {
-        throw new UnsupportedOperationException();
-    }
-    BigDecimal asNumber() {
-        throw new UnsupportedOperationException();
-    }
-    SdkBytes asBytes() {
-        throw new UnsupportedOperationException();
-    }
-    Boolean asBoolean() {
-        throw new UnsupportedOperationException();
-    }
-    List<String> asListOfStrings() {
-        throw new UnsupportedOperationException();
-    }
-    List<BigDecimal> asListOfNumbers() {
-        throw new UnsupportedOperationException();
-    }
-    List<SdkBytes> asListOfBytes() {
-        throw new UnsupportedOperationException();
-    }
-    List<ItemAttributeValue> asListOfAttributeValues() {
-        throw new UnsupportedOperationException();
+    public static ItemAttributeValue fromString(String stringValue) {
+        return new InternalBuilder().stringValue(stringValue).build();
     }
 
-    boolean isJavaType() {
-        throw new UnsupportedOperationException();
+    public static ItemAttributeValue fromNumber(String numberValue) {
+        return new InternalBuilder().numberValue(numberValue).build();
     }
-    Object asJavaType() {
-        throw new UnsupportedOperationException();
+
+    public static ItemAttributeValue fromBytes(SdkBytes bytesValue) {
+        return new InternalBuilder().bytesValue(bytesValue).build();
     }
-    ItemAttributeValue convertFromJavaType(ItemAttributeValueConverter<?> converter) {
-        throw new UnsupportedOperationException();
+
+    public static ItemAttributeValue fromBoolean(Boolean booleanValue) {
+        return new InternalBuilder().booleanValue(booleanValue).build();
+    }
+
+    public static ItemAttributeValue fromListOfStrings(List<String> listOfStringsValue) {
+        return new InternalBuilder().listOfStringsValue(listOfStringsValue).build();
+    }
+
+    public static ItemAttributeValue fromListOfNumbers(List<String> listOfNumbersValue) {
+        return new InternalBuilder().listOfNumbersValue(listOfNumbersValue).build();
+    }
+
+    public static ItemAttributeValue fromListOfBytes(List<SdkBytes> listOfBytesValue) {
+        return new InternalBuilder().listOfBytesValue(listOfBytesValue).build();
+    }
+
+    public static ItemAttributeValue fromListOfAttributeValues(List<ItemAttributeValue> listOfAttributeValuesValue) {
+        return new InternalBuilder().listOfAttributeValuesValue(listOfAttributeValuesValue).build();
+    }
+
+    public ItemAttributeValueType type() {
+        return type;
+    }
+
+    public boolean isItem() {
+        return itemValue != null;
+    }
+
+    public boolean isString() {
+        return stringValue != null;
+    }
+
+    public boolean isNumber() {
+        return numberValue != null;
+    }
+
+    public boolean isBytes() {
+        return bytesValue!= null;
+    }
+
+    public boolean isBoolean() {
+        return booleanValue != null;
+    }
+
+    public boolean isListOfStrings() {
+        return listOfStringsValue != null;
+    }
+
+    public boolean isListOfNumbers() {
+        return listOfNumbersValue != null;
+    }
+
+    public boolean isListOfBytes() {
+        return bytesValue != null;
+    }
+
+    public boolean isListOfAttributeValues() {
+        return listOfAttributeValuesValue != null;
+    }
+
+    public boolean isNull() {
+        return isNull;
+    }
+
+    public Item asItem() {
+        Validate.isTrue(isItem(), "Value is not an item.");
+        return itemValue;
+    }
+
+    public String asString() {
+        Validate.isTrue(isString(), "Value is not a string.");
+        return stringValue;
+    }
+
+    public String asNumber() {
+        Validate.isTrue(isNumber(), "Value is not a number.");
+        return numberValue;
+    }
+
+    public SdkBytes asBytes() {
+        Validate.isTrue(isBytes(), "Value is not bytes.");
+        return bytesValue;
+    }
+
+    public Boolean asBoolean() {
+        Validate.isTrue(isBoolean(), "Value is not a boolean.");
+        return booleanValue;
+    }
+
+    public List<String> asListOfStrings() {
+        Validate.isTrue(isListOfStrings(), "Value is not a list of strings.");
+        return listOfStringsValue;
+    }
+
+    public List<String> asListOfNumbers() {
+        Validate.isTrue(isListOfNumbers(), "Value is not a list of numbers.");
+        return listOfNumbersValue;
+    }
+
+    public List<SdkBytes> asListOfBytes() {
+        Validate.isTrue(isListOfBytes(), "Value is not a list of bytes.");
+        return listOfBytesValue;
+    }
+
+    public List<ItemAttributeValue> asListOfAttributeValues() {
+        Validate.isTrue(isListOfAttributeValues(), "Value is not a list of attribute values.");
+        return listOfAttributeValuesValue;
+    }
+
+    private static class InternalBuilder {
+        private ItemAttributeValueType type;
+        private boolean isNull = false;
+        private Item itemValue;
+        private String stringValue;
+        private String numberValue;
+        private SdkBytes bytesValue;
+        private Boolean booleanValue;
+        private Collection<String> listOfStringsValue;
+        private Collection<String> listOfNumbersValue;
+        private Collection<SdkBytes> listOfBytesValue;
+        private Collection<ItemAttributeValue> listOfAttributeValuesValue;
+
+        public InternalBuilder isNull() {
+            this.type = ItemAttributeValueType.NULL;
+            this.isNull = true;
+            return this;
+        }
+
+        private InternalBuilder itemValue(Item itemValue) {
+            this.type = ItemAttributeValueType.ITEM;
+            this.itemValue = itemValue;
+            return this;
+        }
+
+        private InternalBuilder stringValue(String stringValue) {
+            this.type = ItemAttributeValueType.STRING;
+            this.stringValue = stringValue;
+            return this;
+        }
+
+        private InternalBuilder numberValue(String numberValue) {
+            this.type = ItemAttributeValueType.NUMBER;
+            this.numberValue = numberValue;
+            return this;
+        }
+
+        private InternalBuilder bytesValue(SdkBytes bytesValue) {
+            this.type = ItemAttributeValueType.BYTES;
+            this.bytesValue = bytesValue;
+            return this;
+        }
+
+        private InternalBuilder booleanValue(Boolean booleanValue) {
+            this.type = ItemAttributeValueType.BOOLEAN;
+            this.booleanValue = booleanValue;
+            return this;
+        }
+
+        private InternalBuilder listOfStringsValue(Collection<String> listOfStringsValue) {
+            this.type = ItemAttributeValueType.LIST_OF_STRINGS;
+            this.listOfStringsValue = listOfStringsValue;
+            return this;
+        }
+
+        private InternalBuilder listOfNumbersValue(Collection<String> listOfNumbersValue) {
+            this.type = ItemAttributeValueType.LIST_OF_NUMBERS;
+            this.listOfNumbersValue = listOfNumbersValue;
+            return this;
+        }
+
+        private InternalBuilder listOfBytesValue(Collection<SdkBytes> listOfBytesValue) {
+            this.type = ItemAttributeValueType.LIST_OF_BYTES;
+            this.listOfBytesValue = listOfBytesValue;
+            return this;
+        }
+
+        private InternalBuilder listOfAttributeValuesValue(Collection<ItemAttributeValue> listOfAttributeValuesValue) {
+            this.type = ItemAttributeValueType.LIST_OF_ATTRIBUTE_VALUES;
+            this.listOfAttributeValuesValue = listOfAttributeValuesValue;
+            return this;
+        }
+
+        private ItemAttributeValue build() {
+            return new ItemAttributeValue(this);
+        }
     }
 }

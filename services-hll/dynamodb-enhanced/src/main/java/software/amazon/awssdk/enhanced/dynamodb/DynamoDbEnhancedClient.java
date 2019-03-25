@@ -1,8 +1,6 @@
 package software.amazon.awssdk.enhanced.dynamodb;
 
-import java.util.function.Consumer;
 import software.amazon.awssdk.annotations.ThreadSafe;
-import software.amazon.awssdk.enhanced.dynamodb.model.EnhancedListTablesResponse;
 import software.amazon.awssdk.enhanced.dynamodb.model.Table;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.utils.builder.CopyableBuilder;
@@ -39,8 +37,6 @@ public interface DynamoDbEnhancedClient extends ToCopyableBuilder<DynamoDbEnhanc
 
     Table table(String tableName);
 
-    EnhancedListTablesResponse listTables();
-
     /**
      * The builder for the high-level DynamoDB client. This is used by customers to configure the high-level client with default
      * values to be applied across all client operations.
@@ -48,9 +44,6 @@ public interface DynamoDbEnhancedClient extends ToCopyableBuilder<DynamoDbEnhanc
      * This can be created via {@link DynamoDbEnhancedClient#builder()}.
      */
     interface Builder extends CopyableBuilder<Builder, DynamoDbEnhancedClient> {
-        Builder overrideConfiguration(EnhancedClientOverrideConfiguration overrideConfiguration);
-        Builder overrideConfiguration(Consumer<EnhancedClientOverrideConfiguration.Builder> overrideConfiguration);
-
         DynamoDbEnhancedClient build();
     }
 }

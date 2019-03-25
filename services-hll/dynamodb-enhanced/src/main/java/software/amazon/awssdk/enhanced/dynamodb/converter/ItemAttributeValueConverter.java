@@ -1,10 +1,9 @@
 package software.amazon.awssdk.enhanced.dynamodb.converter;
 
-import software.amazon.awssdk.enhanced.dynamodb.converter.condition.ConversionCondition;
 import software.amazon.awssdk.enhanced.dynamodb.model.ItemAttributeValue;
 
-public interface ItemAttributeValueConverter<T> {
+public interface ItemAttributeValueConverter {
     ConversionCondition defaultConversionCondition();
-    ItemAttributeValue toAttributeValue(T input, ConversionContext context);
-    T fromAttributeValue(ItemAttributeValue input, ConversionContext context);
+    ItemAttributeValue toAttributeValue(Object input, ConversionContext context);
+    <U> U fromAttributeValue(ItemAttributeValue input, ConversionContext context, Class<U> desiredType);
 }
