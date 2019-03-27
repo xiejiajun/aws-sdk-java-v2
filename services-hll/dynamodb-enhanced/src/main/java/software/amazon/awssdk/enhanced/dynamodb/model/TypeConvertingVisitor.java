@@ -8,7 +8,7 @@ public abstract class TypeConvertingVisitor<T> {
         return null;
     }
 
-    public T convertItem(Item value) {
+    public T convertItem(ResponseItem value) {
         return defaultConvert(value);
     }
 

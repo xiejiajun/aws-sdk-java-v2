@@ -7,12 +7,12 @@ public interface Table {
         throw new UnsupportedOperationException();
     }
 
-    default void putItem(Item item) {
+    default void putItem(ResponseItem item) {
         throw new UnsupportedOperationException();
     }
 
-    default void putItem(Consumer<Item.Builder> item) {
-        Item.Builder itemBuilder = Item.builder();
+    default void putItem(Consumer<ResponseItem.Builder> item) {
+        ResponseItem.Builder itemBuilder = ResponseItem.builder();
         item.accept(itemBuilder);
         putItem(itemBuilder.build());
     }

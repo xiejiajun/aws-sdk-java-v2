@@ -1,9 +1,8 @@
 package software.amazon.awssdk.enhanced.dynamodb.internal.converter.model;
 
-import java.util.function.Consumer;
 import software.amazon.awssdk.enhanced.dynamodb.converter.ItemAttributeValueConverter;
-import software.amazon.awssdk.enhanced.dynamodb.model.Item;
-import software.amazon.awssdk.enhanced.dynamodb.model.ItemAttributeValue;
+import software.amazon.awssdk.enhanced.dynamodb.model.RequestItem;
+import software.amazon.awssdk.enhanced.dynamodb.model.ResponseItem;
 import software.amazon.awssdk.enhanced.dynamodb.model.Table;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.utils.builder.Buildable;
@@ -25,9 +24,8 @@ public class DefaultTable implements Table {
     }
 
     @Override
-    public void putItem(Item item) {
+    public void putItem(RequestItem item) {
         item.
-        converter.to(attribute, )
     }
 
     public static class Builder implements Buildable {

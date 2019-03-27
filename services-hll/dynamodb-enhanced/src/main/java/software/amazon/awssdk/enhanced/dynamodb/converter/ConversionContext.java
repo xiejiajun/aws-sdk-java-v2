@@ -1,14 +1,13 @@
 package software.amazon.awssdk.enhanced.dynamodb.converter;
 
-import java.util.Optional;
-import software.amazon.awssdk.enhanced.dynamodb.model.Item;
+import software.amazon.awssdk.enhanced.dynamodb.model.ResponseItem;
 import software.amazon.awssdk.utils.Validate;
 import software.amazon.awssdk.utils.builder.CopyableBuilder;
 import software.amazon.awssdk.utils.builder.ToCopyableBuilder;
 
 public final class ConversionContext implements ToCopyableBuilder<ConversionContext.Builder, ConversionContext> {
     private final String attributeName;
-    private final Item parent;
+    private final ResponseItem parent;
     private final ItemAttributeValueConverter converter;
 
     private ConversionContext(Builder builder) {
@@ -32,13 +31,6 @@ public final class ConversionContext implements ToCopyableBuilder<ConversionCont
         return converter;
     }
 
-    /**
-     * The item that contains the attribute being converted, or Optional.empty() if there is no parent (eg. for root items).
-     */
-    public Optional<Item> parent() {
-        return Optional.ofNullable(this.parent);
-    }
-
     @Override
     public Builder toBuilder() {
         return new Builder(this);
@@ -46,7 +38,7 @@ public final class ConversionContext implements ToCopyableBuilder<ConversionCont
 
     public final static class Builder implements CopyableBuilder<ConversionContext.Builder, ConversionContext> {
         private String attributeName;
-        private Item parent;
+        private ResponseItem parent;
         private ItemAttributeValueConverter converter;
 
         private Builder() {}
@@ -66,7 +58,7 @@ public final class ConversionContext implements ToCopyableBuilder<ConversionCont
             return this;
         }
 
-        public Builder parent(Item parent) {
+        public Builder parent(ResponseItem parent) {
             this.parent = parent;
             return this;
         }

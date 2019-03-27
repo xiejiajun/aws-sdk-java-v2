@@ -12,7 +12,7 @@ import software.amazon.awssdk.utils.Validate;
 public class ItemAttributeValue {
     private final ItemAttributeValueType type;
     private final boolean isNull;
-    private final Item itemValue;
+    private final ResponseItem itemValue;
     private final String stringValue;
     private final String numberValue;
     private final SdkBytes bytesValue;
@@ -49,7 +49,7 @@ public class ItemAttributeValue {
         return new InternalBuilder().isNull().build();
     }
 
-    public static ItemAttributeValue fromItem(Item itemValue) {
+    public static ItemAttributeValue fromItem(ResponseItem itemValue) {
         return new InternalBuilder().itemValue(itemValue).build();
     }
 
@@ -145,7 +145,7 @@ public class ItemAttributeValue {
         return isNull;
     }
 
-    public Item asItem() {
+    public ResponseItem asItem() {
         Validate.isTrue(isItem(), "Value is not an item.");
         return itemValue;
     }
@@ -193,7 +193,7 @@ public class ItemAttributeValue {
     private static class InternalBuilder {
         private ItemAttributeValueType type;
         private boolean isNull = false;
-        private Item itemValue;
+        private ResponseItem itemValue;
         private String stringValue;
         private String numberValue;
         private SdkBytes bytesValue;
@@ -209,7 +209,7 @@ public class ItemAttributeValue {
             return this;
         }
 
-        private InternalBuilder itemValue(Item itemValue) {
+        private InternalBuilder itemValue(ResponseItem itemValue) {
             this.type = ItemAttributeValueType.ITEM;
             this.itemValue = itemValue;
             return this;

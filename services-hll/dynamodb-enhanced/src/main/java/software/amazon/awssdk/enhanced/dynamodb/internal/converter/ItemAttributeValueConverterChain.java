@@ -1,13 +1,11 @@
 package software.amazon.awssdk.enhanced.dynamodb.internal.converter;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import software.amazon.awssdk.enhanced.dynamodb.converter.ConversionCondition;
 import software.amazon.awssdk.enhanced.dynamodb.converter.ConversionContext;
 import software.amazon.awssdk.enhanced.dynamodb.converter.ItemAttributeValueConverter;
-import software.amazon.awssdk.enhanced.dynamodb.model.Item;
 import software.amazon.awssdk.enhanced.dynamodb.model.ItemAttributeValue;
 import software.amazon.awssdk.enhanced.dynamodb.model.TypeToken;
 import software.amazon.awssdk.utils.Logger;
