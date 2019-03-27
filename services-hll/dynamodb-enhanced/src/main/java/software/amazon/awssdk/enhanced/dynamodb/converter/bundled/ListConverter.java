@@ -3,6 +3,7 @@ package software.amazon.awssdk.enhanced.dynamodb.converter.bundled;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import software.amazon.awssdk.core.SdkBytes;
@@ -36,17 +37,17 @@ public class ListConverter extends ExactInstanceOfConverter<List<?>> {
 
         return input.convert(new TypeConvertingVisitor<List<?>>() {
             @Override
-            public List<?> convertListOfStrings(Collection<String> value) {
+            public List<?> convertSetOfStrings(Set<String> value) {
                 return convertCollection(value, ItemAttributeValue::fromString);
             }
 
             @Override
-            public List<?> convertListOfNumbers(Collection<String> value) {
+            public List<?> convertSetOfNumbers(Set<String> value) {
                 return convertCollection(value, ItemAttributeValue::fromNumber);
             }
 
             @Override
-            public List<?> convertListOfBytes(Collection<SdkBytes> value) {
+            public List<?> convertSetOfBytes(Set<SdkBytes> value) {
                 return convertCollection(value, ItemAttributeValue::fromBytes);
             }
 
@@ -56,7 +57,7 @@ public class ListConverter extends ExactInstanceOfConverter<List<?>> {
             }
 
             private <T> List<?> convertCollection(Collection<T> collection,
-                                                     Function<T, ItemAttributeValue> toAttributeValueFunction) {
+                                                  Function<T, ItemAttributeValue> toAttributeValueFunction) {
                 return collection.stream()
                                 .map(toAttributeValueFunction)
                                 .map(v -> context.converter().fromAttributeValue(v, parameterType, context))

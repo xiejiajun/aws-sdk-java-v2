@@ -1,25 +1,20 @@
 package software.amazon.awssdk.enhanced.dynamodb.model;
 
-import software.amazon.awssdk.enhanced.dynamodb.converter.ItemAttributeValueConverter;
+import java.util.Map;
 import software.amazon.awssdk.enhanced.dynamodb.internal.converter.model.DefaultResponseItem;
 import software.amazon.awssdk.utils.builder.CopyableBuilder;
 import software.amazon.awssdk.utils.builder.ToCopyableBuilder;
 
-public interface ResponseItem extends ConverterAwareItem,
-                                      Item<ConvertableItemAttributeValue>,
+public interface ResponseItem extends Item<ConvertableItemAttributeValue>,
                                       ToCopyableBuilder<ResponseItem.Builder, ResponseItem> {
     static Builder builder() {
         return DefaultResponseItem.builder();
     }
 
-    interface Builder extends ConverterAwareItem.Builder,
-                              Item.Builder<ConvertableItemAttributeValue>,
+    interface Builder extends Item.Builder<ConvertableItemAttributeValue>,
                               CopyableBuilder<ResponseItem.Builder, ResponseItem> {
         @Override
-        Builder addConverter(ItemAttributeValueConverter converter);
-
-        @Override
-        Builder clearConverters();
+        Builder putAttributes(Map<String, ConvertableItemAttributeValue> attributeValues);
 
         @Override
         Builder putAttribute(String attributeKey, ConvertableItemAttributeValue attributeValue);

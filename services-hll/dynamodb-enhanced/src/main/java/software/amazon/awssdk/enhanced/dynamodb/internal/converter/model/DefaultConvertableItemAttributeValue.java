@@ -2,7 +2,6 @@ package software.amazon.awssdk.enhanced.dynamodb.internal.converter.model;
 
 import java.util.function.Consumer;
 import software.amazon.awssdk.enhanced.dynamodb.converter.ConversionContext;
-import software.amazon.awssdk.enhanced.dynamodb.converter.ItemAttributeValueConverter;
 import software.amazon.awssdk.enhanced.dynamodb.model.ConvertableItemAttributeValue;
 import software.amazon.awssdk.enhanced.dynamodb.model.ItemAttributeValue;
 import software.amazon.awssdk.enhanced.dynamodb.model.TypeToken;
@@ -46,18 +45,12 @@ public final class DefaultConvertableItemAttributeValue implements ConvertableIt
 
     public static class Builder {
         private ItemAttributeValue attributeValue;
-        private ItemAttributeValueConverter converter;
         private ConversionContext conversionContext;
 
         private Builder() {}
 
         public Builder attributeValue(ItemAttributeValue attributeValue) {
             this.attributeValue = attributeValue;
-            return this;
-        }
-
-        public Builder converter(ItemAttributeValueConverter converter) {
-            this.converter = converter;
             return this;
         }
 

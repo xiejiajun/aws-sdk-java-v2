@@ -114,6 +114,7 @@
         <guava.version>26.0-jre</guava.version>
         <jimfs.version>1.1</jimfs.version>
         <commons-lang.verson>2.3</commons-lang.verson>
+        <dynamodb-local.version>1.11.477</dynamodb-local.version>
 
         <!-- build plugin dependencies-->
         <maven.surefire.version>2.21.0</maven.surefire.version>

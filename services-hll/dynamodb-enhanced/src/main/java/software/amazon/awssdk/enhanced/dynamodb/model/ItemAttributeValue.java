@@ -1,45 +1,58 @@
 package software.amazon.awssdk.enhanced.dynamodb.model;
 
+import static java.util.stream.Collectors.toList;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import software.amazon.awssdk.annotations.ThreadSafe;
 import software.amazon.awssdk.core.SdkBytes;
+import software.amazon.awssdk.core.util.SdkAutoConstructList;
+import software.amazon.awssdk.core.util.SdkAutoConstructMap;
+import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
+import software.amazon.awssdk.utils.ToString;
 import software.amazon.awssdk.utils.Validate;
 
 @ThreadSafe
 public class ItemAttributeValue {
     private final ItemAttributeValueType type;
     private final boolean isNull;
-    private final ResponseItem itemValue;
+    private final Map<String, ItemAttributeValue> mapValue;
     private final String stringValue;
     private final String numberValue;
     private final SdkBytes bytesValue;
     private final Boolean booleanValue;
-    private final List<String> listOfStringsValue;
-    private final List<String> listOfNumbersValue;
-    private final List<SdkBytes> listOfBytesValue;
+    private final Set<String> setOfStringsValue;
+    private final Set<String> setOfNumbersValue;
+    private final Set<SdkBytes> setOfBytesValue;
     private final List<ItemAttributeValue> listOfAttributeValuesValue;
 
     private ItemAttributeValue(InternalBuilder builder) {
         this.type = builder.type;
         this.isNull = builder.isNull;
-        this.itemValue = builder.itemValue;
         this.stringValue = builder.stringValue;
         this.numberValue = builder.numberValue;
         this.bytesValue = builder.bytesValue;
         this.booleanValue = builder.booleanValue;
 
-        this.listOfStringsValue = builder.listOfStringsValue == null
-                                  ? null
-                                  : Collections.unmodifiableList(new ArrayList<>(builder.listOfStringsValue));
-        this.listOfNumbersValue = builder.listOfNumbersValue == null
-                                  ? null
-                                  : Collections.unmodifiableList(new ArrayList<>(builder.listOfNumbersValue));
-        this.listOfBytesValue = builder.listOfBytesValue == null
-                                ? null
-                                : Collections.unmodifiableList(new ArrayList<>(builder.listOfBytesValue));
+        this.mapValue = builder.mapValue == null
+                        ? null
+                        : Collections.unmodifiableMap(new LinkedHashMap<>(builder.mapValue));
+        this.setOfStringsValue = builder.setOfStringsValue == null
+                                 ? null
+                                 : Collections.unmodifiableSet(new LinkedHashSet<>(builder.setOfStringsValue));
+        this.setOfNumbersValue = builder.setOfNumbersValue == null
+                                 ? null
+                                 : Collections.unmodifiableSet(new LinkedHashSet<>(builder.setOfNumbersValue));
+        this.setOfBytesValue = builder.setOfBytesValue == null
+                               ? null
+                               : Collections.unmodifiableSet(new LinkedHashSet<>(builder.setOfBytesValue));
         this.listOfAttributeValuesValue = builder.listOfAttributeValuesValue == null
                                           ? null
                                           : Collections.unmodifiableList(new ArrayList<>(builder.listOfAttributeValuesValue));
@@ -49,8 +62,8 @@ public class ItemAttributeValue {
         return new InternalBuilder().isNull().build();
     }
 
-    public static ItemAttributeValue fromItem(ResponseItem itemValue) {
-        return new InternalBuilder().itemValue(itemValue).build();
+    public static ItemAttributeValue fromMap(Map<String, ItemAttributeValue> mapValue) {
+        return new InternalBuilder().mapValue(mapValue).build();
     }
 
     public static ItemAttributeValue fromString(String stringValue) {
@@ -69,44 +82,71 @@ public class ItemAttributeValue {
         return new InternalBuilder().booleanValue(booleanValue).build();
     }
 
-    public static ItemAttributeValue fromListOfStrings(List<String> listOfStringsValue) {
-        return new InternalBuilder().listOfStringsValue(listOfStringsValue).build();
+    public static ItemAttributeValue fromSetOfStrings(Collection<String> setOfStringsValue) {
+        return new InternalBuilder().setOfStringsValue(setOfStringsValue).build();
     }
 
-    public static ItemAttributeValue fromListOfNumbers(List<String> listOfNumbersValue) {
-        return new InternalBuilder().listOfNumbersValue(listOfNumbersValue).build();
+    public static ItemAttributeValue fromSetOfNumbers(Collection<String> setOfNumbersValue) {
+        return new InternalBuilder().setOfNumbersValue(setOfNumbersValue).build();
     }
 
-    public static ItemAttributeValue fromListOfBytes(List<SdkBytes> listOfBytesValue) {
-        return new InternalBuilder().listOfBytesValue(listOfBytesValue).build();
+    public static ItemAttributeValue fromSetOfBytes(Collection<SdkBytes> setOfBytesValue) {
+        return new InternalBuilder().setOfBytesValue(setOfBytesValue).build();
     }
 
-    public static ItemAttributeValue fromListOfAttributeValues(List<ItemAttributeValue> listOfAttributeValuesValue) {
-        return new InternalBuilder().listOfAttributeValuesValue(listOfAttributeValuesValue).build();
+    public static ItemAttributeValue fromListOfAttributeValues(List<ItemAttributeValue> ListOfAttributeValuesValue) {
+        return new InternalBuilder().listOfAttributeValuesValue(ListOfAttributeValuesValue).build();
+    }
+
+    public static ItemAttributeValue fromGeneratedAttributeValue(AttributeValue attributeValue) {
+        if (attributeValue.s() != null) {
+            return ItemAttributeValue.fromString(attributeValue.s());
+        }
+        if (attributeValue.n() != null) {
+            return ItemAttributeValue.fromNumber(attributeValue.n());
+        }
+        if (attributeValue.bool() != null) {
+            return ItemAttributeValue.fromBoolean(attributeValue.bool());
+        }
+        if (Boolean.TRUE.equals(attributeValue.nul())) {
+            return ItemAttributeValue.nullValue();
+        }
+        if (attributeValue.b() != null) {
+            return ItemAttributeValue.fromBytes(attributeValue.b());
+        }
+        if (attributeValue.m() != null && !(attributeValue.m() instanceof SdkAutoConstructMap)) {
+            Map<String, ItemAttributeValue> map = new LinkedHashMap<>();
+            attributeValue.m().forEach((k, v) -> map.put(k, ItemAttributeValue.fromGeneratedAttributeValue(v)));
+            return ItemAttributeValue.fromMap(map);
+        }
+        if (attributeValue.l() != null && !(attributeValue.l() instanceof SdkAutoConstructList)) {
+            List<ItemAttributeValue> list =
+                    attributeValue.l().stream().map(ItemAttributeValue::fromGeneratedAttributeValue).collect(toList());
+            return ItemAttributeValue.fromListOfAttributeValues(list);
+        }
+        if (attributeValue.bs() != null && !(attributeValue.bs() instanceof SdkAutoConstructList)) {
+            return ItemAttributeValue.fromSetOfBytes(attributeValue.bs());
+        }
+        if (attributeValue.ss() != null && !(attributeValue.bs() instanceof SdkAutoConstructList)) {
+            return ItemAttributeValue.fromSetOfStrings(attributeValue.ss());
+        }
+        if (attributeValue.ns() != null && !(attributeValue.ns() instanceof SdkAutoConstructList)) {
+            return ItemAttributeValue.fromSetOfNumbers(attributeValue.ns());
+        }
+
+        throw new IllegalStateException("Unable to convert attribute value: " + attributeValue);
     }
 
     public <T> T convert(TypeConvertingVisitor<T> convertingVisitor) {
-        switch (type()) {
-            case NULL: return convertingVisitor.convertNull();
-            case ITEM: return convertingVisitor.convertItem(itemValue);
-            case STRING: return convertingVisitor.convertString(stringValue);
-            case NUMBER: return convertingVisitor.convertNumber(numberValue);
-            case BYTES: return convertingVisitor.convertBytes(bytesValue);
-            case BOOLEAN: return convertingVisitor.convertBoolean(booleanValue);
-            case LIST_OF_STRINGS: return convertingVisitor.convertListOfStrings(listOfStringsValue);
-            case LIST_OF_NUMBERS: return convertingVisitor.convertListOfNumbers(listOfNumbersValue);
-            case LIST_OF_BYTES: return convertingVisitor.convertListOfBytes(listOfBytesValue);
-            case LIST_OF_ATTRIBUTE_VALUES: return convertingVisitor.convertListOfAttributeValues(listOfAttributeValuesValue);
-            default: throw new IllegalStateException("Unsupported type: " + type);
-        }
+        return convertingVisitor.convert(this);
     }
 
     public ItemAttributeValueType type() {
         return type;
     }
 
-    public boolean isItem() {
-        return itemValue != null;
+    public boolean isMap() {
+        return mapValue != null;
     }
 
     public boolean isString() {
@@ -125,15 +165,15 @@ public class ItemAttributeValue {
         return booleanValue != null;
     }
 
-    public boolean isListOfStrings() {
-        return listOfStringsValue != null;
+    public boolean isSetOfStrings() {
+        return setOfStringsValue != null;
     }
 
-    public boolean isListOfNumbers() {
-        return listOfNumbersValue != null;
+    public boolean isSetOfNumbers() {
+        return setOfNumbersValue != null;
     }
 
-    public boolean isListOfBytes() {
+    public boolean isSetOfBytes() {
         return bytesValue != null;
     }
 
@@ -145,9 +185,9 @@ public class ItemAttributeValue {
         return isNull;
     }
 
-    public ResponseItem asItem() {
-        Validate.isTrue(isItem(), "Value is not an item.");
-        return itemValue;
+    public Map<String, ItemAttributeValue> asMap() {
+        Validate.isTrue(isMap(), "Value is not a map.");
+        return mapValue;
     }
 
     public String asString() {
@@ -170,19 +210,19 @@ public class ItemAttributeValue {
         return booleanValue;
     }
 
-    public List<String> asListOfStrings() {
-        Validate.isTrue(isListOfStrings(), "Value is not a list of strings.");
-        return listOfStringsValue;
+    public Set<String> asSetOfStrings() {
+        Validate.isTrue(isSetOfStrings(), "Value is not a list of strings.");
+        return setOfStringsValue;
     }
 
-    public List<String> asListOfNumbers() {
-        Validate.isTrue(isListOfNumbers(), "Value is not a list of numbers.");
-        return listOfNumbersValue;
+    public Set<String> asSetOfNumbers() {
+        Validate.isTrue(isSetOfNumbers(), "Value is not a list of numbers.");
+        return setOfNumbersValue;
     }
 
-    public List<SdkBytes> asListOfBytes() {
-        Validate.isTrue(isListOfBytes(), "Value is not a list of bytes.");
-        return listOfBytesValue;
+    public Set<SdkBytes> asSetOfBytes() {
+        Validate.isTrue(isSetOfBytes(), "Value is not a list of bytes.");
+        return setOfBytesValue;
     }
 
     public List<ItemAttributeValue> asListOfAttributeValues() {
@@ -190,17 +230,124 @@ public class ItemAttributeValue {
         return listOfAttributeValuesValue;
     }
 
+    public AttributeValue toGeneratedAttributeValue() {
+        return convert(ToGeneratedAttributeValueVisitor.INSTANCE);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        ItemAttributeValue that = (ItemAttributeValue) o;
+        return isNull == that.isNull &&
+               type == that.type &&
+               Objects.equals(mapValue, that.mapValue) &&
+               Objects.equals(stringValue, that.stringValue) &&
+               Objects.equals(numberValue, that.numberValue) &&
+               Objects.equals(bytesValue, that.bytesValue) &&
+               Objects.equals(booleanValue, that.booleanValue) &&
+               Objects.equals(setOfStringsValue, that.setOfStringsValue) &&
+               Objects.equals(setOfNumbersValue, that.setOfNumbersValue) &&
+               Objects.equals(setOfBytesValue, that.setOfBytesValue) &&
+               Objects.equals(listOfAttributeValuesValue, that.listOfAttributeValuesValue);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(type, isNull, mapValue, stringValue, numberValue, bytesValue, booleanValue, setOfStringsValue,
+                            setOfNumbersValue, setOfBytesValue, listOfAttributeValuesValue);
+    }
+
+    @Override
+    public String toString() {
+        return ToString.builder("ItemAttributeValue")
+                       .add("type", type)
+                       .add("null", isNull)
+                       .add("map", mapValue)
+                       .add("string", stringValue)
+                       .add("number", numberValue)
+                       .add("bytes", bytesValue)
+                       .add("boolean", booleanValue)
+                       .add("setOfStrings", setOfStringsValue)
+                       .add("setOfNumbers", setOfNumbersValue)
+                       .add("setOfBytes", setOfBytesValue)
+                       .add("listOfAttributeValues", listOfAttributeValuesValue)
+                       .build();
+    }
+
+    private static class ToGeneratedAttributeValueVisitor extends TypeConvertingVisitor<AttributeValue> {
+        private static final ToGeneratedAttributeValueVisitor INSTANCE = new ToGeneratedAttributeValueVisitor();
+
+        @Override
+        public AttributeValue convertNull() {
+            return AttributeValue.builder().nul(true).build();
+        }
+
+        @Override
+        public AttributeValue convertMap(Map<String, ItemAttributeValue> value) {
+            Map<String, AttributeValue> map = new LinkedHashMap<>();
+            value.forEach((k, v) -> map.put(k, v.toGeneratedAttributeValue()));
+            return AttributeValue.builder().m(map).build();
+        }
+
+        @Override
+        public AttributeValue convertString(String value) {
+            return AttributeValue.builder().s(value).build();
+        }
+
+        @Override
+        public AttributeValue convertNumber(String value) {
+            return AttributeValue.builder().n(value).build();
+        }
+
+        @Override
+        public AttributeValue convertBytes(SdkBytes value) {
+            return AttributeValue.builder().b(value).build();
+        }
+
+        @Override
+        public AttributeValue convertBoolean(Boolean value) {
+            return AttributeValue.builder().bool(value).build();
+        }
+
+        @Override
+        public AttributeValue convertSetOfStrings(Set<String> value) {
+            return AttributeValue.builder().ss(value).build();
+        }
+
+        @Override
+        public AttributeValue convertSetOfNumbers(Set<String> value) {
+            return AttributeValue.builder().ns(value).build();
+        }
+
+        @Override
+        public AttributeValue convertSetOfBytes(Set<SdkBytes> value) {
+            return AttributeValue.builder().bs(value).build();
+        }
+
+        @Override
+        public AttributeValue convertListOfAttributeValues(Collection<ItemAttributeValue> value) {
+            return AttributeValue.builder()
+                                 .l(value.stream().map(ItemAttributeValue::toGeneratedAttributeValue).collect(toList()))
+                                 .build();
+        }
+    }
+
     private static class InternalBuilder {
         private ItemAttributeValueType type;
         private boolean isNull = false;
-        private ResponseItem itemValue;
+        private Map<String, ItemAttributeValue> mapValue;
         private String stringValue;
         private String numberValue;
         private SdkBytes bytesValue;
         private Boolean booleanValue;
-        private Collection<String> listOfStringsValue;
-        private Collection<String> listOfNumbersValue;
-        private Collection<SdkBytes> listOfBytesValue;
+        private Collection<String> setOfStringsValue;
+        private Collection<String> setOfNumbersValue;
+        private Collection<SdkBytes> setOfBytesValue;
         private Collection<ItemAttributeValue> listOfAttributeValuesValue;
 
         public InternalBuilder isNull() {
@@ -209,9 +356,9 @@ public class ItemAttributeValue {
             return this;
         }
 
-        private InternalBuilder itemValue(ResponseItem itemValue) {
-            this.type = ItemAttributeValueType.ITEM;
-            this.itemValue = itemValue;
+        private InternalBuilder mapValue(Map<String, ItemAttributeValue> mapValue) {
+            this.type = ItemAttributeValueType.MAP;
+            this.mapValue = mapValue;
             return this;
         }
 
@@ -239,21 +386,21 @@ public class ItemAttributeValue {
             return this;
         }
 
-        private InternalBuilder listOfStringsValue(Collection<String> listOfStringsValue) {
-            this.type = ItemAttributeValueType.LIST_OF_STRINGS;
-            this.listOfStringsValue = listOfStringsValue;
+        private InternalBuilder setOfStringsValue(Collection<String> setOfStringsValue) {
+            this.type = ItemAttributeValueType.SET_OF_STRINGS;
+            this.setOfStringsValue = setOfStringsValue;
             return this;
         }
 
-        private InternalBuilder listOfNumbersValue(Collection<String> listOfNumbersValue) {
-            this.type = ItemAttributeValueType.LIST_OF_NUMBERS;
-            this.listOfNumbersValue = listOfNumbersValue;
+        private InternalBuilder setOfNumbersValue(Collection<String> setOfNumbersValue) {
+            this.type = ItemAttributeValueType.SET_OF_NUMBERS;
+            this.setOfNumbersValue = setOfNumbersValue;
             return this;
         }
 
-        private InternalBuilder listOfBytesValue(Collection<SdkBytes> listOfBytesValue) {
-            this.type = ItemAttributeValueType.LIST_OF_BYTES;
-            this.listOfBytesValue = listOfBytesValue;
+        private InternalBuilder setOfBytesValue(Collection<SdkBytes> setOfBytesValue) {
+            this.type = ItemAttributeValueType.SET_OF_BYTES;
+            this.setOfBytesValue = setOfBytesValue;
             return this;
         }
 

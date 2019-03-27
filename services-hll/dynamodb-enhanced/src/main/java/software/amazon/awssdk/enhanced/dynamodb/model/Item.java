@@ -7,6 +7,7 @@ public interface Item<AttributeT> {
     AttributeT attribute(String attributeKey);
 
     interface Builder<AttributeT> {
+        Builder putAttributes(Map<String, AttributeT> attributeValues);
         Builder putAttribute(String attributeKey, AttributeT attributeValue);
         Builder removeAttribute(String attributeKey);
     }

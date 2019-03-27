@@ -15,7 +15,7 @@ public abstract class DefaultItem<AttributeT> implements ConverterAwareItem, Ite
 
     protected DefaultItem(Builder<AttributeT, ?> builder) {
         this.converters = new ArrayList<>(builder.converters);
-        this.attributes = new HashMap<>(builder.attributes);
+        this.attributes = new LinkedHashMap<>(builder.attributes);
     }
 
     @Override
@@ -36,7 +36,7 @@ public abstract class DefaultItem<AttributeT> implements ConverterAwareItem, Ite
     public static abstract class Builder<AttributeT, BuilderT extends Builder<AttributeT, BuilderT>>
             implements ConverterAwareItem.Builder,
                        Item.Builder<AttributeT> {
-        private Map<String, AttributeT> attributes = new HashMap<>();
+        private Map<String, AttributeT> attributes = new LinkedHashMap<>();
         private List<ItemAttributeValueConverter> converters = new ArrayList<>();
 
         protected Builder() {}
@@ -44,6 +44,12 @@ public abstract class DefaultItem<AttributeT> implements ConverterAwareItem, Ite
         protected Builder(DefaultItem<AttributeT> item) {
             this.attributes.putAll(item.attributes);
             this.converters.addAll(item.converters);
+        }
+
+        @Override
+        public BuilderT putAttributes(Map<String, AttributeT> attributeValues) {
+            this.attributes.putAll(attributeValues);
+            return (BuilderT) this;
         }
 
         @Override

@@ -1,5 +1,6 @@
 package software.amazon.awssdk.enhanced.dynamodb.model;
 
+import java.util.Map;
 import software.amazon.awssdk.enhanced.dynamodb.converter.ItemAttributeValueConverter;
 import software.amazon.awssdk.enhanced.dynamodb.internal.converter.model.DefaultRequestItem;
 import software.amazon.awssdk.utils.builder.CopyableBuilder;
@@ -12,6 +13,8 @@ public interface RequestItem extends ConverterAwareItem,
         return DefaultRequestItem.builder();
     }
 
+    GeneratedRequestItem toGeneratedRequestItem();
+
     interface Builder extends ConverterAwareItem.Builder,
                               Item.Builder<Object>,
                               CopyableBuilder<RequestItem.Builder, RequestItem> {
@@ -20,6 +23,9 @@ public interface RequestItem extends ConverterAwareItem,
 
         @Override
         Builder clearConverters();
+
+        @Override
+        Builder putAttributes(Map<String, Object> attributeValues);
 
         @Override
         Builder putAttribute(String attributeKey, Object attributeValue);

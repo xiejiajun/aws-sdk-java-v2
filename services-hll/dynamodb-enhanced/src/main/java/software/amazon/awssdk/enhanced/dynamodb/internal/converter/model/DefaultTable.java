@@ -2,9 +2,14 @@ package software.amazon.awssdk.enhanced.dynamodb.internal.converter.model;
 
 import software.amazon.awssdk.enhanced.dynamodb.converter.ItemAttributeValueConverter;
 import software.amazon.awssdk.enhanced.dynamodb.internal.converter.ItemAttributeValueConverterChain;
+import software.amazon.awssdk.enhanced.dynamodb.model.ConverterAwareItem;
+import software.amazon.awssdk.enhanced.dynamodb.model.GeneratedRequestItem;
+import software.amazon.awssdk.enhanced.dynamodb.model.GeneratedResponseItem;
 import software.amazon.awssdk.enhanced.dynamodb.model.RequestItem;
+import software.amazon.awssdk.enhanced.dynamodb.model.ResponseItem;
 import software.amazon.awssdk.enhanced.dynamodb.model.Table;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
+import software.amazon.awssdk.services.dynamodb.model.GetItemResponse;
 import software.amazon.awssdk.utils.builder.Buildable;
 
 public class DefaultTable implements Table {
@@ -24,22 +29,41 @@ public class DefaultTable implements Table {
     }
 
     @Override
-    public void putItem(RequestItem item) {
-        item = addClientLevelConverter(item);
+    public ResponseItem getItem(RequestItem key) {
+        key = addClientConverter(key);
 
-        item.toBuilder()
-            .clearConverters()
+        GeneratedRequestItem generatedKey = key.toGeneratedRequestItem();
+
+        GetItemResponse response = client.getItem(r -> r.key(generatedKey.attributes()));
+
+        GeneratedResponseItem generatedResponse = GeneratedResponseItem.builder()
+                                                                       .putAttributes(response.item())
+                                                                       .addConverter(converter)
+                                                                       .build();
+
+        return generatedResponse.toResponseItem();
     }
 
-    private RequestItem addClientLevelConverter(RequestItem item) {
-        ItemAttributeValueConverterChain itemChain =
-                ItemAttributeValueConverterChain.builder()
-                                                .addConverters(item.converters())
-                                                .parentChain()
-                                                .build()
-        return item.toBuilder()
-                   .clearConverters()
+    @Override
+    public void putItem(RequestItem item) {
+        item = addClientConverter(item);
 
+        GeneratedRequestItem generatedRequest = item.toGeneratedRequestItem();
+        client.putItem(r -> r.item(generatedRequest.attributes()));
+    }
+
+    private RequestItem addClientConverter(RequestItem key) {
+        return key.toBuilder()
+                  .clearConverters()
+                  .addConverter(getConverter(key))
+                  .build();
+    }
+
+    private ItemAttributeValueConverter getConverter(ConverterAwareItem item) {
+        return ItemAttributeValueConverterChain.builder()
+                                               .parent(converter)
+                                               .addConverters(item.converters())
+                                               .build();
     }
 
     public static class Builder implements Buildable {

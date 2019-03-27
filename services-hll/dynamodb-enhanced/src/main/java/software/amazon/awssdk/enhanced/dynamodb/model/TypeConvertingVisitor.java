@@ -1,50 +1,88 @@
 package software.amazon.awssdk.enhanced.dynamodb.model;
 
 import java.util.Collection;
+import java.util.Map;
+import java.util.Set;
 import software.amazon.awssdk.core.SdkBytes;
+import software.amazon.awssdk.enhanced.dynamodb.converter.ItemAttributeValueConverter;
 
 public abstract class TypeConvertingVisitor<T> {
+    private final Class<ItemAttributeValueConverter> converterClass;
+    private final Class<?> targetType;
+
+    protected TypeConvertingVisitor(Class<ItemAttributeValueConverter> converterClass,
+                                    Class<?> targetType) {
+        this.converterClass = converterClass;
+        this.targetType = targetType;
+    }
+
+    protected TypeConvertingVisitor() {
+        this.converterClass = null;
+        this.targetType = null;
+    }
+
+    public T convert(ItemAttributeValue value) {
+        switch (value.type()) {
+            case NULL: return convertNull();
+            case MAP: return convertMap(value.asMap());
+            case STRING: return convertString(value.asString());
+            case NUMBER: return convertNumber(value.asNumber());
+            case BYTES: return convertBytes(value.asBytes());
+            case BOOLEAN: return convertBoolean(value.asBoolean());
+            case SET_OF_STRINGS: return convertSetOfStrings(value.asSetOfStrings());
+            case SET_OF_NUMBERS: return convertSetOfNumbers(value.asSetOfNumbers());
+            case SET_OF_BYTES: return convertSetOfBytes(value.asSetOfBytes());
+            case LIST_OF_ATTRIBUTE_VALUES: return convertListOfAttributeValues(value.asListOfAttributeValues());
+            default: throw new IllegalStateException("Unsupported type: " + value.type());
+        }
+    }
+
     public T convertNull() {
         return null;
     }
 
-    public T convertItem(ResponseItem value) {
-        return defaultConvert(value);
+    public T convertMap(Map<String, ItemAttributeValue> value) {
+        return defaultConvert(ItemAttributeValueType.MAP, value);
     }
 
     public T convertString(String value) {
-        return defaultConvert(value);
+        return defaultConvert(ItemAttributeValueType.STRING, value);
     }
 
     public T convertNumber(String value) {
-        return defaultConvert(value);
+        return defaultConvert(ItemAttributeValueType.NUMBER, value);
     }
 
     public T convertBytes(SdkBytes value) {
-        return defaultConvert(value);
+        return defaultConvert(ItemAttributeValueType.BYTES, value);
     }
 
     public T convertBoolean(Boolean value) {
-        return defaultConvert(value);
+        return defaultConvert(ItemAttributeValueType.BOOLEAN, value);
     }
 
-    public T convertListOfStrings(Collection<String> value) {
-        return defaultConvert(value);
+    public T convertSetOfStrings(Set<String> value) {
+        return defaultConvert(ItemAttributeValueType.SET_OF_STRINGS, value);
     }
 
-    public T convertListOfNumbers(Collection<String> value) {
-        return defaultConvert(value);
+    public T convertSetOfNumbers(Set<String> value) {
+        return defaultConvert(ItemAttributeValueType.SET_OF_NUMBERS, value);
     }
 
-    public T convertListOfBytes(Collection<SdkBytes> value) {
-        return defaultConvert(value);
+    public T convertSetOfBytes(Set<SdkBytes> value) {
+        return defaultConvert(ItemAttributeValueType.SET_OF_BYTES, value);
     }
 
     public T convertListOfAttributeValues(Collection<ItemAttributeValue> value) {
-        return defaultConvert(value);
+        return defaultConvert(ItemAttributeValueType.LIST_OF_ATTRIBUTE_VALUES, value);
     }
 
-    public T defaultConvert(Object value) {
-        throw new IllegalStateException("Value cannot be converted to the requested type: " + value);
+    public T defaultConvert(ItemAttributeValueType type, Object value) {
+        if (converterClass != null && targetType != null) {
+            throw new IllegalStateException(converterClass.getTypeName() + " cannot convert an attribute of type " + type +
+                                            " into the requested type " + targetType);
+        }
+
+        throw new IllegalStateException("Cannot convert attribute of type " + type);
     }
 }

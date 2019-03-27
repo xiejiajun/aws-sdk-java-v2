@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 import software.amazon.awssdk.enhanced.dynamodb.converter.ConversionCondition;
 import software.amazon.awssdk.enhanced.dynamodb.converter.ConversionContext;
 import software.amazon.awssdk.enhanced.dynamodb.converter.ItemAttributeValueConverter;
@@ -17,7 +18,7 @@ public class ItemAttributeValueConverterChain implements ItemAttributeValueConve
     private final List<ItemAttributeValueConverter> converters;
     private final List<ItemAttributeValueConverter> instanceOfConverters = new ArrayList<>();
     private final ConcurrentHashMap<Class<?>, ItemAttributeValueConverter> converterCache = new ConcurrentHashMap<>();
-    private final ItemAttributeValueConverterChain parentChain;
+    private final ItemAttributeValueConverter parent;
 
     private ItemAttributeValueConverterChain(Builder builder) {
         this.converters = builder.converters;
@@ -34,11 +35,15 @@ public class ItemAttributeValueConverterChain implements ItemAttributeValueConve
             }
         }
 
-        this.parentChain = builder.parentChain;
+        this.parent = builder.parent;
     }
 
     public static ItemAttributeValueConverterChain.Builder builder() {
         return new ItemAttributeValueConverterChain.Builder();
+    }
+
+    public static ItemAttributeValueConverterChain create(Collection<? extends ItemAttributeValueConverter> converters) {
+        return builder().addConverters(converters).build();
     }
 
     @Override
@@ -48,29 +53,44 @@ public class ItemAttributeValueConverterChain implements ItemAttributeValueConve
 
     @Override
     public ItemAttributeValue toAttributeValue(Object input, ConversionContext context) {
-        return getConverter(input.getClass()).toAttributeValue(input, context);
+        return invokeConverter(input.getClass(), c -> c.toAttributeValue(input, context));
     }
 
     @Override
     public Object fromAttributeValue(ItemAttributeValue input, TypeToken<?> desiredType, ConversionContext context) {
-        return getConverter(desiredType.representedClass()).fromAttributeValue(input, desiredType, context);
+        return invokeConverter(desiredType.representedClass(), c -> c.fromAttributeValue(input, desiredType, context));
     }
 
-    private <T> ItemAttributeValueConverter getConverter(Class<T> type) {
+    private <T> T invokeConverter(Class<?> type, Function<ItemAttributeValueConverter, T> converterInvoker) {
         log.trace(() -> "Loading converter for " + type.getTypeName() + ".");
 
         ItemAttributeValueConverter converter = converterCache.get(type);
 
         if (converter != null) {
-            return converter;
+            return converterInvoker.apply(converter);
         }
 
-        ItemAttributeValueConverter result = getUncachedConverter(type);
-        converterCache.put(type, result);
+        converter = findConverter(type);
+
+        if (converter == null && parent != null) {
+            log.trace(() -> "Converter not found in this chain for " + type.getTypeName() + ". Parent will be used.");
+            converter = parent;
+        }
+
+        if (converter == null) {
+            throw new IllegalArgumentException("Converter not found for " + type.getTypeName() + ".");
+        }
+
+
+        T result = converterInvoker.apply(converter);
+
+        // Only cache after successful conversion, to prevent leaking memory.
+        this.converterCache.put(type, converter);
+
         return result;
     }
 
-    private ItemAttributeValueConverter getUncachedConverter(Class<?> type) {
+    private ItemAttributeValueConverter findConverter(Class<?> type) {
         log.trace(() -> "Converter not cached for " + type.getTypeName() + ". " +
                         "Checking for an instanceof converter match.");
 
@@ -83,17 +103,12 @@ public class ItemAttributeValueConverterChain implements ItemAttributeValueConve
             }
         }
 
-        if (parentChain != null) {
-            log.trace(() -> "Converter not found in this chain for " + type.getTypeName() + ". Checking parent.");
-            return parentChain.getConverter(type);
-        }
-
-        throw new IllegalArgumentException("Converter not found for " + type.getTypeName() + ".");
+        return null;
     }
 
     public static class Builder {
         private List<ItemAttributeValueConverter> converters = new ArrayList<>();
-        private ItemAttributeValueConverterChain parentChain;
+        private ItemAttributeValueConverter parent;
 
         private Builder() {}
 
@@ -112,8 +127,8 @@ public class ItemAttributeValueConverterChain implements ItemAttributeValueConve
             return this;
         }
 
-        public Builder parentChain(ItemAttributeValueConverterChain parentChain) {
-            this.parentChain = parentChain;
+        public Builder parent(ItemAttributeValueConverter parent) {
+            this.parent = parent;
             return this;
         }
 

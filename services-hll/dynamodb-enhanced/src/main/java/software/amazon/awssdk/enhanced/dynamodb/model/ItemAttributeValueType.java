@@ -1,14 +1,14 @@
 package software.amazon.awssdk.enhanced.dynamodb.model;
 
 public enum ItemAttributeValueType {
-    ITEM,
+    MAP,
     STRING,
     NUMBER,
     BYTES,
     BOOLEAN,
     NULL,
-    LIST_OF_STRINGS,
-    LIST_OF_NUMBERS,
-    LIST_OF_BYTES,
+    SET_OF_STRINGS,
+    SET_OF_NUMBERS,
+    SET_OF_BYTES,
     LIST_OF_ATTRIBUTE_VALUES
 }

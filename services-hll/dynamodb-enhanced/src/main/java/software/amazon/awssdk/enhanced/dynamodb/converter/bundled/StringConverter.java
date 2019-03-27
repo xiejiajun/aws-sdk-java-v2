@@ -1,7 +1,10 @@
 package software.amazon.awssdk.enhanced.dynamodb.converter.bundled;
 
+import static java.util.stream.Collectors.toList;
+
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
+import java.util.Set;
 import java.util.stream.Collectors;
 import software.amazon.awssdk.core.SdkBytes;
 import software.amazon.awssdk.enhanced.dynamodb.converter.ConversionContext;
@@ -46,20 +49,20 @@ public class StringConverter extends ExactInstanceOfConverter<String> {
         }
 
         @Override
-        public String convertListOfStrings(Collection<String> value) {
+        public String convertSetOfStrings(Set<String> value) {
             return join(value);
         }
 
         @Override
-        public String convertListOfNumbers(Collection<String> value) {
+        public String convertSetOfNumbers(Set<String> value) {
             return join(value);
         }
 
         @Override
-        public String convertListOfBytes(Collection<SdkBytes> value) {
+        public String convertSetOfBytes(Set<SdkBytes> value) {
             Collection<String> values = value.stream()
                                              .map(b -> b.asString(StandardCharsets.UTF_8))
-                                             .collect(Collectors.toList());
+                                             .collect(toList());
             return String.join(", ", values);
         }
 

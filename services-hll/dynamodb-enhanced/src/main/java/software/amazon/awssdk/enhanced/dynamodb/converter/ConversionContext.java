@@ -6,13 +6,11 @@ import software.amazon.awssdk.utils.builder.ToCopyableBuilder;
 
 public final class ConversionContext implements ToCopyableBuilder<ConversionContext.Builder, ConversionContext> {
     private final String attributeName;
-    private final ResponseItem parent;
     private final ItemAttributeValueConverter converter;
 
     private ConversionContext(Builder builder) {
         this.attributeName = Validate.paramNotNull(builder.attributeName, "attributeName");
         this.converter = Validate.paramNotNull(builder.converter, "converter");
-        this.parent = builder.parent;
     }
 
     public static Builder builder() {
@@ -37,14 +35,12 @@ public final class ConversionContext implements ToCopyableBuilder<ConversionCont
 
     public final static class Builder implements CopyableBuilder<ConversionContext.Builder, ConversionContext> {
         private String attributeName;
-        private ResponseItem parent;
         private ItemAttributeValueConverter converter;
 
         private Builder() {}
 
         public Builder(ConversionContext context) {
             this.attributeName = context.attributeName;
-            this.parent = context.parent;
         }
 
         public Builder attributeName(String attributeName) {
@@ -54,11 +50,6 @@ public final class ConversionContext implements ToCopyableBuilder<ConversionCont
 
         public Builder converter(ItemAttributeValueConverter converter) {
             this.converter = converter;
-            return this;
-        }
-
-        public Builder parent(ResponseItem parent) {
-            this.parent = parent;
             return this;
         }
 
