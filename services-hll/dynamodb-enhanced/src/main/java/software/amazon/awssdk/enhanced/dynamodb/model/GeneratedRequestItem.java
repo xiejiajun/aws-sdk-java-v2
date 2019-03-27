@@ -1,18 +1,24 @@
 package software.amazon.awssdk.enhanced.dynamodb.model;
 
-import java.util.Map;
+import software.amazon.awssdk.enhanced.dynamodb.internal.converter.model.DefaultGeneratedItem;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
+import software.amazon.awssdk.utils.builder.CopyableBuilder;
+import software.amazon.awssdk.utils.builder.ToCopyableBuilder;
 
-public class GeneratedRequestItem {
-    private final Map<String, AttributeValue> attributeValues;
-
-    private GeneratedRequestItem(Builder builder) {
-
+public interface GeneratedRequestItem extends Item<AttributeValue>,
+                                              ToCopyableBuilder<GeneratedRequestItem.Builder, GeneratedRequestItem> {
+    static Builder builder() {
+        return DefaultGeneratedItem.builder();
     }
 
-    public static class Builder {
-        private Builder() {}
+    interface Builder extends Item.Builder<AttributeValue>,
+                              CopyableBuilder<GeneratedRequestItem.Builder, GeneratedRequestItem>{
+        @Override
+        Builder putAttribute(String attributeKey, AttributeValue attributeValue);
 
-        public Builder putAttribute(String key, AttributeValue)
+        @Override
+        Builder removeAttribute(String attributeKey);
+
+        GeneratedRequestItem build();
     }
 }

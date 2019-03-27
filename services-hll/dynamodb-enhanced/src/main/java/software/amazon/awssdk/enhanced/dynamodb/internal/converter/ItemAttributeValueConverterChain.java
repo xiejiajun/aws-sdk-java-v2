@@ -1,6 +1,7 @@
 package software.amazon.awssdk.enhanced.dynamodb.internal.converter;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import software.amazon.awssdk.enhanced.dynamodb.converter.ConversionCondition;
@@ -95,6 +96,11 @@ public class ItemAttributeValueConverterChain implements ItemAttributeValueConve
         private ItemAttributeValueConverterChain parentChain;
 
         private Builder() {}
+
+        public Builder addConverters(Collection<? extends ItemAttributeValueConverter> converters) {
+            this.converters.addAll(converters);
+            return this;
+        }
 
         public Builder addConverter(ItemAttributeValueConverter converter) {
             this.converters.add(converter);

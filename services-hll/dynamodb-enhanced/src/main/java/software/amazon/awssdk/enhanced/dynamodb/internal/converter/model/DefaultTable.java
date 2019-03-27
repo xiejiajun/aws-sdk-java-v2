@@ -1,8 +1,8 @@
 package software.amazon.awssdk.enhanced.dynamodb.internal.converter.model;
 
 import software.amazon.awssdk.enhanced.dynamodb.converter.ItemAttributeValueConverter;
+import software.amazon.awssdk.enhanced.dynamodb.internal.converter.ItemAttributeValueConverterChain;
 import software.amazon.awssdk.enhanced.dynamodb.model.RequestItem;
-import software.amazon.awssdk.enhanced.dynamodb.model.ResponseItem;
 import software.amazon.awssdk.enhanced.dynamodb.model.Table;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.utils.builder.Buildable;
@@ -25,7 +25,21 @@ public class DefaultTable implements Table {
 
     @Override
     public void putItem(RequestItem item) {
-        item.
+        item = addClientLevelConverter(item);
+
+        item.toBuilder()
+            .clearConverters()
+    }
+
+    private RequestItem addClientLevelConverter(RequestItem item) {
+        ItemAttributeValueConverterChain itemChain =
+                ItemAttributeValueConverterChain.builder()
+                                                .addConverters(item.converters())
+                                                .parentChain()
+                                                .build()
+        return item.toBuilder()
+                   .clearConverters()
+
     }
 
     public static class Builder implements Buildable {

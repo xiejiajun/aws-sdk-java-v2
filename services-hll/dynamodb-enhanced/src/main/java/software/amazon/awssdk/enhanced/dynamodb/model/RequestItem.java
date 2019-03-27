@@ -1,61 +1,32 @@
 package software.amazon.awssdk.enhanced.dynamodb.model;
 
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
 import software.amazon.awssdk.enhanced.dynamodb.converter.ItemAttributeValueConverter;
+import software.amazon.awssdk.enhanced.dynamodb.internal.converter.model.DefaultRequestItem;
+import software.amazon.awssdk.utils.builder.CopyableBuilder;
+import software.amazon.awssdk.utils.builder.ToCopyableBuilder;
 
-public class RequestItem extends Item {
-    private final Map<String, Object> attributes;
-
-    public RequestItem(Builder builder) {
-        super(builder);
-        this.attributes = new HashMap<>(builder.attributes);
+public interface RequestItem extends ConverterAwareItem,
+                                     Item<Object>,
+                                     ToCopyableBuilder<RequestItem.Builder, RequestItem> {
+    static Builder builder() {
+        return DefaultRequestItem.builder();
     }
 
-    public static Builder builder() {
-        return new Builder();
-    }
-
-    public Map<String, Object> attributes() {
-        return Collections.unmodifiableMap(attributes);
-    }
-
-    public Object attribute(String attributeKey) {
-        return attributes.get(attributeKey);
-    }
-
-    public GeneratedRequestItem toGeneratedItem() {
-
-    }
-
-    public static final class Builder extends Item.Builder {
-        private Map<String, Object> attributes = new HashMap<>();
-
-        public Builder putAttribute(String attributeKey, Object attributeValue) {
-            this.attributes.put(attributeKey, attributeValue);
-            return this;
-        }
-
-        public Builder removeAttribute(String attributeKey) {
-            this.attributes.remove(attributeKey);
-            return this;
-        }
+    interface Builder extends ConverterAwareItem.Builder,
+                              Item.Builder<Object>,
+                              CopyableBuilder<RequestItem.Builder, RequestItem> {
+        @Override
+        Builder addConverter(ItemAttributeValueConverter converter);
 
         @Override
-        public Builder addConverter(ItemAttributeValueConverter converter) {
-            super.addConverter(converter);
-            return this;
-        }
+        Builder clearConverters();
 
         @Override
-        public Builder clearConverters() {
-            super.clearConverters();
-            return this;
-        }
+        Builder putAttribute(String attributeKey, Object attributeValue);
 
-        public RequestItem build() {
-            return new RequestItem(this);
-        }
+        @Override
+        Builder removeAttribute(String attributeKey);
+
+        RequestItem build();
     }
 }
