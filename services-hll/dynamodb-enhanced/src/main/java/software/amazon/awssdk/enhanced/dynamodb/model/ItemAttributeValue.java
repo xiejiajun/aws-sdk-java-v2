@@ -85,6 +85,22 @@ public class ItemAttributeValue {
         return new InternalBuilder().listOfAttributeValuesValue(listOfAttributeValuesValue).build();
     }
 
+    public <T> T convert(TypeConvertingVisitor<T> convertingVisitor) {
+        switch (type()) {
+            case NULL: return convertingVisitor.convertNull();
+            case ITEM: return convertingVisitor.convertItem(itemValue);
+            case STRING: return convertingVisitor.convertString(stringValue);
+            case NUMBER: return convertingVisitor.convertNumber(numberValue);
+            case BYTES: return convertingVisitor.convertBytes(bytesValue);
+            case BOOLEAN: return convertingVisitor.convertBoolean(booleanValue);
+            case LIST_OF_STRINGS: return convertingVisitor.convertListOfStrings(listOfStringsValue);
+            case LIST_OF_NUMBERS: return convertingVisitor.convertListOfNumbers(listOfNumbersValue);
+            case LIST_OF_BYTES: return convertingVisitor.convertListOfBytes(listOfBytesValue);
+            case LIST_OF_ATTRIBUTE_VALUES: return convertingVisitor.convertListOfAttributeValues(listOfAttributeValuesValue);
+            default: throw new IllegalStateException("Unsupported type: " + type);
+        }
+    }
+
     public ItemAttributeValueType type() {
         return type;
     }

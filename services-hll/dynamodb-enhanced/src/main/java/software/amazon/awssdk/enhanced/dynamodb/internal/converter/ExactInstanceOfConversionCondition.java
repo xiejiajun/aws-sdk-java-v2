@@ -9,7 +9,7 @@ public class ExactInstanceOfConversionCondition implements ConversionCondition {
         this.clazz = clazz;
     }
 
-    public boolean converts(Class<?> clazz) {
-        return this.clazz.equals(clazz);
+    public Class<?> convertedClass() {
+        return clazz;
     }
 }
