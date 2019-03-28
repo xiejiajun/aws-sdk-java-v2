@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import software.amazon.awssdk.annotations.SdkPublicApi;
 import software.amazon.awssdk.annotations.ThreadSafe;
 import software.amazon.awssdk.core.SdkBytes;
 import software.amazon.awssdk.core.util.SdkAutoConstructList;
@@ -19,8 +20,9 @@ import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.utils.ToString;
 import software.amazon.awssdk.utils.Validate;
 
+@SdkPublicApi
 @ThreadSafe
-public class ItemAttributeValue {
+public final class ItemAttributeValue {
     private final ItemAttributeValueType type;
     private final boolean isNull;
     private final Map<String, ItemAttributeValue> mapValue;
@@ -96,6 +98,12 @@ public class ItemAttributeValue {
 
     public static ItemAttributeValue fromListOfAttributeValues(List<ItemAttributeValue> ListOfAttributeValuesValue) {
         return new InternalBuilder().listOfAttributeValuesValue(ListOfAttributeValuesValue).build();
+    }
+
+    public static ItemAttributeValue fromGeneratedItem(Map<String, AttributeValue> attributeValues) {
+        Map<String, ItemAttributeValue> result = new LinkedHashMap<>();
+        attributeValues.forEach((k, v) -> result.put(k, fromGeneratedAttributeValue(v)));
+        return ItemAttributeValue.fromMap(result);
     }
 
     public static ItemAttributeValue fromGeneratedAttributeValue(AttributeValue attributeValue) {
@@ -230,6 +238,17 @@ public class ItemAttributeValue {
         return listOfAttributeValuesValue;
     }
 
+    public Map<String, AttributeValue> toGeneratedItem() {
+        Validate.validState(isMap(), "Cannot convert an attribute value of type %s to a generated item. Must be %s.",
+                            type(), ItemAttributeValueType.MAP);
+
+        AttributeValue generatedAttributeValue = toGeneratedAttributeValue();
+
+        Validate.validState(generatedAttributeValue.m() != null && !(generatedAttributeValue.m() instanceof SdkAutoConstructMap),
+                            "Map ItemAttributeValue was not converted into a Map AttributeValue.");
+        return generatedAttributeValue.m();
+    }
+
     public AttributeValue toGeneratedAttributeValue() {
         return convert(ToGeneratedAttributeValueVisitor.INSTANCE);
     }
@@ -281,6 +300,10 @@ public class ItemAttributeValue {
 
     private static class ToGeneratedAttributeValueVisitor extends TypeConvertingVisitor<AttributeValue> {
         private static final ToGeneratedAttributeValueVisitor INSTANCE = new ToGeneratedAttributeValueVisitor();
+
+        private ToGeneratedAttributeValueVisitor() {
+            super(AttributeValue.class);
+        }
 
         @Override
         public AttributeValue convertNull() {

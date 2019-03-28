@@ -3,25 +3,28 @@ package software.amazon.awssdk.enhanced.dynamodb.model;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Set;
+import software.amazon.awssdk.annotations.SdkPublicApi;
+import software.amazon.awssdk.annotations.ThreadSafe;
 import software.amazon.awssdk.core.SdkBytes;
 import software.amazon.awssdk.enhanced.dynamodb.converter.ItemAttributeValueConverter;
 
+@SdkPublicApi
+@ThreadSafe
 public abstract class TypeConvertingVisitor<T> {
-    private final Class<ItemAttributeValueConverter> converterClass;
+    private final Class<? extends ItemAttributeValueConverter> converterClass;
     private final Class<?> targetType;
 
-    protected TypeConvertingVisitor(Class<ItemAttributeValueConverter> converterClass,
-                                    Class<?> targetType) {
+    protected TypeConvertingVisitor(Class<?> targetType,
+                                    Class<? extends ItemAttributeValueConverter> converterClass) {
         this.converterClass = converterClass;
         this.targetType = targetType;
     }
 
-    protected TypeConvertingVisitor() {
-        this.converterClass = null;
-        this.targetType = null;
+    protected TypeConvertingVisitor(Class<?> targetType) {
+        this(targetType, null);
     }
 
-    public T convert(ItemAttributeValue value) {
+    public final T convert(ItemAttributeValue value) {
         switch (value.type()) {
             case NULL: return convertNull();
             case MAP: return convertMap(value.asMap());

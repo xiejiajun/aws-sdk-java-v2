@@ -1,7 +1,11 @@
 package software.amazon.awssdk.enhanced.dynamodb.model;
 
 import java.util.function.Consumer;
+import software.amazon.awssdk.annotations.SdkPublicApi;
+import software.amazon.awssdk.annotations.ThreadSafe;
 
+@SdkPublicApi
+@ThreadSafe
 public interface Table {
     default String name() {
         throw new UnsupportedOperationException();

@@ -30,8 +30,12 @@ import java.lang.reflect.WildcardType;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import software.amazon.awssdk.annotations.SdkPublicApi;
+import software.amazon.awssdk.annotations.ThreadSafe;
+import software.amazon.awssdk.enhanced.dynamodb.internal.model.DefaultParameterizedType;
 import software.amazon.awssdk.utils.ToString;
 import software.amazon.awssdk.utils.Validate;
 
@@ -40,6 +44,8 @@ import software.amazon.awssdk.utils.Validate;
  *
  * Original Guava authors: Bob Lee, Sven Mawson, Ben Yu
  */
+@SdkPublicApi
+@ThreadSafe
 public class TypeToken<T> {
     private final Type runtimeType;
     private final Class<T> representedClass;
@@ -61,6 +67,14 @@ public class TypeToken<T> {
 
     public static <T> TypeToken<T> from(Class<T> type) {
         return new TypeToken<>(Validate.paramNotNull(type, "type"));
+    }
+
+    public static <T> TypeToken<List<T>> listOf(Class<T> valueType) {
+        return new TypeToken<>(DefaultParameterizedType.parameterizedType(List.class, valueType));
+    }
+
+    public static <T, U> TypeToken<Map<T, U>> mapOf(Class<T> keyType, Class<U> valueType) {
+        return new TypeToken<>(DefaultParameterizedType.parameterizedType(Map.class, keyType, valueType));
     }
 
     public static TypeToken<?> from(Type type) {

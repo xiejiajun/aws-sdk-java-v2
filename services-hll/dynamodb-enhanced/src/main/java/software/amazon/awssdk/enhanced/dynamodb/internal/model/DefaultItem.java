@@ -1,15 +1,20 @@
-package software.amazon.awssdk.enhanced.dynamodb.internal.converter.model;
+package software.amazon.awssdk.enhanced.dynamodb.internal.model;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import software.amazon.awssdk.annotations.SdkInternalApi;
+import software.amazon.awssdk.annotations.ThreadSafe;
 import software.amazon.awssdk.enhanced.dynamodb.converter.ItemAttributeValueConverter;
-import software.amazon.awssdk.enhanced.dynamodb.model.ConverterAwareItem;
-import software.amazon.awssdk.enhanced.dynamodb.model.Item;
+import software.amazon.awssdk.enhanced.dynamodb.model.ConverterAware;
+import software.amazon.awssdk.enhanced.dynamodb.model.AttributeAware;
 
-public abstract class DefaultItem<AttributeT> implements ConverterAwareItem, Item<AttributeT> {
+@SdkInternalApi
+@ThreadSafe
+public abstract class DefaultItem<AttributeT> implements ConverterAware, AttributeAware<AttributeT> {
     private final Map<String, AttributeT> attributes;
     private final List<ItemAttributeValueConverter> converters;
 
@@ -34,8 +39,8 @@ public abstract class DefaultItem<AttributeT> implements ConverterAwareItem, Ite
     }
 
     public static abstract class Builder<AttributeT, BuilderT extends Builder<AttributeT, BuilderT>>
-            implements ConverterAwareItem.Builder,
-                       Item.Builder<AttributeT> {
+            implements ConverterAware.Builder,
+                       AttributeAware.Builder<AttributeT> {
         private Map<String, AttributeT> attributes = new LinkedHashMap<>();
         private List<ItemAttributeValueConverter> converters = new ArrayList<>();
 
@@ -61,6 +66,18 @@ public abstract class DefaultItem<AttributeT> implements ConverterAwareItem, Ite
         @Override
         public BuilderT removeAttribute(String attributeKey) {
             this.attributes.remove(attributeKey);
+            return (BuilderT) this;
+        }
+
+        @Override
+        public BuilderT clearAttributes() {
+            this.attributes.clear();
+            return (BuilderT) this;
+        }
+
+        @Override
+        public BuilderT addConverters(Collection<? extends ItemAttributeValueConverter> converters) {
+            this.converters.addAll(converters);
             return (BuilderT) this;
         }
 

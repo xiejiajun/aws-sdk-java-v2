@@ -1,8 +1,12 @@
-package software.amazon.awssdk.enhanced.dynamodb.internal.converter.model;
+package software.amazon.awssdk.enhanced.dynamodb.internal.model;
 
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import software.amazon.awssdk.annotations.SdkInternalApi;
+import software.amazon.awssdk.annotations.ThreadSafe;
 
+@SdkInternalApi
+@ThreadSafe
 public final class DefaultParameterizedType implements ParameterizedType {
     private final Class<?> rawType;
     private final Type[] arguments;

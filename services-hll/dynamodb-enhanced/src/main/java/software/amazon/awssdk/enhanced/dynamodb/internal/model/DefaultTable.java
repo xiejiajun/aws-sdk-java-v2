@@ -1,8 +1,10 @@
-package software.amazon.awssdk.enhanced.dynamodb.internal.converter.model;
+package software.amazon.awssdk.enhanced.dynamodb.internal.model;
 
+import software.amazon.awssdk.annotations.SdkInternalApi;
+import software.amazon.awssdk.annotations.ThreadSafe;
 import software.amazon.awssdk.enhanced.dynamodb.converter.ItemAttributeValueConverter;
 import software.amazon.awssdk.enhanced.dynamodb.internal.converter.ItemAttributeValueConverterChain;
-import software.amazon.awssdk.enhanced.dynamodb.model.ConverterAwareItem;
+import software.amazon.awssdk.enhanced.dynamodb.model.ConverterAware;
 import software.amazon.awssdk.enhanced.dynamodb.model.GeneratedRequestItem;
 import software.amazon.awssdk.enhanced.dynamodb.model.GeneratedResponseItem;
 import software.amazon.awssdk.enhanced.dynamodb.model.RequestItem;
@@ -12,6 +14,8 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.GetItemResponse;
 import software.amazon.awssdk.utils.builder.Buildable;
 
+@SdkInternalApi
+@ThreadSafe
 public class DefaultTable implements Table {
     private final DynamoDbClient client;
     private final String tableName;
@@ -21,6 +25,10 @@ public class DefaultTable implements Table {
         this.client = builder.client;
         this.tableName = builder.tableName;
         this.converter = builder.converter;
+    }
+
+    public static Builder builder() {
+        return new Builder();
     }
 
     @Override
@@ -34,7 +42,8 @@ public class DefaultTable implements Table {
 
         GeneratedRequestItem generatedKey = key.toGeneratedRequestItem();
 
-        GetItemResponse response = client.getItem(r -> r.key(generatedKey.attributes()));
+        GetItemResponse response = client.getItem(r -> r.tableName(tableName)
+                                                        .key(generatedKey.attributes()));
 
         GeneratedResponseItem generatedResponse = GeneratedResponseItem.builder()
                                                                        .putAttributes(response.item())
@@ -49,7 +58,9 @@ public class DefaultTable implements Table {
         item = addClientConverter(item);
 
         GeneratedRequestItem generatedRequest = item.toGeneratedRequestItem();
-        client.putItem(r -> r.item(generatedRequest.attributes()));
+
+        client.putItem(r -> r.tableName(tableName)
+                             .item(generatedRequest.attributes()));
     }
 
     private RequestItem addClientConverter(RequestItem key) {
@@ -59,7 +70,7 @@ public class DefaultTable implements Table {
                   .build();
     }
 
-    private ItemAttributeValueConverter getConverter(ConverterAwareItem item) {
+    private ItemAttributeValueConverter getConverter(ConverterAware item) {
         return ItemAttributeValueConverterChain.builder()
                                                .parent(converter)
                                                .addConverters(item.converters())
@@ -88,7 +99,7 @@ public class DefaultTable implements Table {
 
         @Override
         public DefaultTable build() {
-            return null;
+            return new DefaultTable(this);
         }
     }
 }

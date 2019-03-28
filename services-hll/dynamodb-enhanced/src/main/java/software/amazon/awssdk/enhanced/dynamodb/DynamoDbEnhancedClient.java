@@ -1,8 +1,14 @@
 package software.amazon.awssdk.enhanced.dynamodb;
 
+import java.util.Collection;
+import software.amazon.awssdk.annotations.SdkPublicApi;
 import software.amazon.awssdk.annotations.ThreadSafe;
+import software.amazon.awssdk.enhanced.dynamodb.converter.ItemAttributeValueConverter;
+import software.amazon.awssdk.enhanced.dynamodb.internal.DefaultDynamoDbEnhancedClient;
+import software.amazon.awssdk.enhanced.dynamodb.model.ConverterAware;
 import software.amazon.awssdk.enhanced.dynamodb.model.Table;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
+import software.amazon.awssdk.utils.SdkAutoCloseable;
 import software.amazon.awssdk.utils.builder.CopyableBuilder;
 import software.amazon.awssdk.utils.builder.ToCopyableBuilder;
 
@@ -13,8 +19,10 @@ import software.amazon.awssdk.utils.builder.ToCopyableBuilder;
  * generated automatically and includes the latest service features. This client is hand-written and provides a richer,
  * Java-optimized experience for DynamoDB.
  */
+@SdkPublicApi
 @ThreadSafe
-public interface DynamoDbEnhancedClient extends ToCopyableBuilder<DynamoDbEnhancedClient.Builder, DynamoDbEnhancedClient> {
+public interface DynamoDbEnhancedClient extends ToCopyableBuilder<DynamoDbEnhancedClient.Builder, DynamoDbEnhancedClient>,
+                                                SdkAutoCloseable {
     /**
      * Create a {@link DynamoDbEnhancedClient} with default configuration.
      *
@@ -32,7 +40,7 @@ public interface DynamoDbEnhancedClient extends ToCopyableBuilder<DynamoDbEnhanc
      * configuration.
      */
     static DynamoDbEnhancedClient.Builder builder() {
-        throw new UnsupportedOperationException();
+        return DefaultDynamoDbEnhancedClient.builder();
     }
 
     Table table(String tableName);
@@ -43,7 +51,18 @@ public interface DynamoDbEnhancedClient extends ToCopyableBuilder<DynamoDbEnhanc
      *
      * This can be created via {@link DynamoDbEnhancedClient#builder()}.
      */
-    interface Builder extends CopyableBuilder<Builder, DynamoDbEnhancedClient> {
+    interface Builder extends CopyableBuilder<Builder, DynamoDbEnhancedClient>, ConverterAware.Builder {
+        Builder dynamoDbClient(DynamoDbClient client);
+
+        @Override
+        Builder addConverters(Collection<? extends ItemAttributeValueConverter> converters);
+
+        @Override
+        Builder addConverter(ItemAttributeValueConverter converter);
+
+        @Override
+        Builder clearConverters();
+
         DynamoDbEnhancedClient build();
     }
 }

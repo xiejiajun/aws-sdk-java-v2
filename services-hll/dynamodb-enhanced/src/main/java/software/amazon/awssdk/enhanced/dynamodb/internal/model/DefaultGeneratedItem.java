@@ -1,7 +1,10 @@
-package software.amazon.awssdk.enhanced.dynamodb.internal.converter.model;
+package software.amazon.awssdk.enhanced.dynamodb.internal.model;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import software.amazon.awssdk.annotations.SdkInternalApi;
+import software.amazon.awssdk.annotations.ThreadSafe;
+import software.amazon.awssdk.enhanced.dynamodb.converter.ItemAttributeValueConverter;
 import software.amazon.awssdk.enhanced.dynamodb.internal.converter.ItemAttributeValueConverterChain;
 import software.amazon.awssdk.enhanced.dynamodb.model.ConvertableItemAttributeValue;
 import software.amazon.awssdk.enhanced.dynamodb.model.GeneratedRequestItem;
@@ -10,9 +13,14 @@ import software.amazon.awssdk.enhanced.dynamodb.model.ItemAttributeValue;
 import software.amazon.awssdk.enhanced.dynamodb.model.ResponseItem;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
+@SdkInternalApi
+@ThreadSafe
 public class DefaultGeneratedItem extends DefaultItem<AttributeValue> implements GeneratedRequestItem, GeneratedResponseItem {
+    private final ItemAttributeValueConverter converter;
+
     private DefaultGeneratedItem(Builder builder) {
         super(builder);
+        this.converter = ItemAttributeValueConverterChain.create(converters());
     }
 
     public static Builder builder() {
@@ -27,16 +35,18 @@ public class DefaultGeneratedItem extends DefaultItem<AttributeValue> implements
     }
 
     private Map<String, ConvertableItemAttributeValue> toConvertableAttributes() {
+        ItemAttributeValue attributeValue = ItemAttributeValue.fromGeneratedItem(attributes());
+
         Map<String, ConvertableItemAttributeValue> result = new LinkedHashMap<>();
-        attributes().forEach((key, value) -> result.put(key, toConvertableAttribute(key, value)));
+        attributeValue.asMap().forEach((k, v) -> result.put(k, toConvertableAttribute(k, v)));
         return result;
     }
 
-    private ConvertableItemAttributeValue toConvertableAttribute(String key, AttributeValue value) {
-        ItemAttributeValueConverterChain converterChain = ItemAttributeValueConverterChain.create(converters());
+    private ConvertableItemAttributeValue toConvertableAttribute(String key, ItemAttributeValue value) {
         return DefaultConvertableItemAttributeValue.builder()
-                                                   .conversionContext(cc -> cc.converter(converterChain).attributeName(key))
-                                                   .attributeValue(ItemAttributeValue.fromGeneratedAttributeValue(value))
+                                                   .conversionContext(cc -> cc.attributeName(key)
+                                                                              .converter(converter))
+                                                   .attributeValue(value)
                                                    .build();
     }
 

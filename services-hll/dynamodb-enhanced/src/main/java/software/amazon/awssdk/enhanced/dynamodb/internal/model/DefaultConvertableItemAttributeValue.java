@@ -1,12 +1,16 @@
-package software.amazon.awssdk.enhanced.dynamodb.internal.converter.model;
+package software.amazon.awssdk.enhanced.dynamodb.internal.model;
 
 import java.util.function.Consumer;
+import software.amazon.awssdk.annotations.SdkInternalApi;
+import software.amazon.awssdk.annotations.ThreadSafe;
 import software.amazon.awssdk.enhanced.dynamodb.converter.ConversionContext;
 import software.amazon.awssdk.enhanced.dynamodb.model.ConvertableItemAttributeValue;
 import software.amazon.awssdk.enhanced.dynamodb.model.ItemAttributeValue;
 import software.amazon.awssdk.enhanced.dynamodb.model.TypeToken;
 import software.amazon.awssdk.utils.Validate;
 
+@SdkInternalApi
+@ThreadSafe
 public final class DefaultConvertableItemAttributeValue implements ConvertableItemAttributeValue {
     private final ItemAttributeValue attributeValue;
     private final ConversionContext conversionContext;
@@ -62,7 +66,7 @@ public final class DefaultConvertableItemAttributeValue implements ConvertableIt
         public Builder conversionContext(Consumer<ConversionContext.Builder> conversionContext) {
             ConversionContext.Builder context = ConversionContext.builder();
             conversionContext.accept(context);
-            conversionContext(conversionContext);
+            conversionContext(context.build());
             return this;
         }
 

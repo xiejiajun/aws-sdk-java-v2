@@ -1,15 +1,20 @@
 package software.amazon.awssdk.enhanced.dynamodb.converter;
 
+import java.util.Optional;
+import software.amazon.awssdk.annotations.SdkPublicApi;
+import software.amazon.awssdk.annotations.ThreadSafe;
 import software.amazon.awssdk.utils.Validate;
 import software.amazon.awssdk.utils.builder.CopyableBuilder;
 import software.amazon.awssdk.utils.builder.ToCopyableBuilder;
 
+@SdkPublicApi
+@ThreadSafe
 public final class ConversionContext implements ToCopyableBuilder<ConversionContext.Builder, ConversionContext> {
     private final String attributeName;
     private final ItemAttributeValueConverter converter;
 
     private ConversionContext(Builder builder) {
-        this.attributeName = Validate.paramNotNull(builder.attributeName, "attributeName");
+        this.attributeName = builder.attributeName;
         this.converter = Validate.paramNotNull(builder.converter, "converter");
     }
 
@@ -20,8 +25,8 @@ public final class ConversionContext implements ToCopyableBuilder<ConversionCont
     /**
      * The name of the attribute being converted.
      */
-    public String attributeName() {
-        return this.attributeName;
+    public Optional<String> attributeName() {
+        return Optional.ofNullable(this.attributeName);
     }
 
     public ItemAttributeValueConverter converter() {

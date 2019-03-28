@@ -1,5 +1,10 @@
 package software.amazon.awssdk.enhanced.dynamodb.model;
 
+import software.amazon.awssdk.annotations.SdkPublicApi;
+import software.amazon.awssdk.annotations.ThreadSafe;
+
+@SdkPublicApi
+@ThreadSafe
 public enum ItemAttributeValueType {
     MAP,
     STRING,

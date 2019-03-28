@@ -1,8 +1,12 @@
-package software.amazon.awssdk.enhanced.dynamodb.internal.converter.model;
+package software.amazon.awssdk.enhanced.dynamodb.internal.model;
 
+import software.amazon.awssdk.annotations.SdkInternalApi;
+import software.amazon.awssdk.annotations.ThreadSafe;
 import software.amazon.awssdk.enhanced.dynamodb.model.ConvertableItemAttributeValue;
 import software.amazon.awssdk.enhanced.dynamodb.model.ResponseItem;
 
+@SdkInternalApi
+@ThreadSafe
 public class DefaultResponseItem extends DefaultItem<ConvertableItemAttributeValue> implements ResponseItem {
     private DefaultResponseItem(Builder builder) {
         super(builder);
