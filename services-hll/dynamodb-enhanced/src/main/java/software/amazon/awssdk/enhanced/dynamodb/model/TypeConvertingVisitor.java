@@ -1,8 +1,8 @@
 package software.amazon.awssdk.enhanced.dynamodb.model;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import software.amazon.awssdk.annotations.SdkPublicApi;
 import software.amazon.awssdk.annotations.ThreadSafe;
 import software.amazon.awssdk.core.SdkBytes;
@@ -64,15 +64,15 @@ public abstract class TypeConvertingVisitor<T> {
         return defaultConvert(ItemAttributeValueType.BOOLEAN, value);
     }
 
-    public T convertSetOfStrings(Set<String> value) {
+    public T convertSetOfStrings(List<String> value) {
         return defaultConvert(ItemAttributeValueType.SET_OF_STRINGS, value);
     }
 
-    public T convertSetOfNumbers(Set<String> value) {
+    public T convertSetOfNumbers(List<String> value) {
         return defaultConvert(ItemAttributeValueType.SET_OF_NUMBERS, value);
     }
 
-    public T convertSetOfBytes(Set<SdkBytes> value) {
+    public T convertSetOfBytes(List<SdkBytes> value) {
         return defaultConvert(ItemAttributeValueType.SET_OF_BYTES, value);
     }
 

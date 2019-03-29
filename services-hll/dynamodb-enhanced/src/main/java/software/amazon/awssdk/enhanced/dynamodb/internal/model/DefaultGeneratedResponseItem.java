@@ -4,10 +4,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import software.amazon.awssdk.annotations.SdkInternalApi;
 import software.amazon.awssdk.annotations.ThreadSafe;
-import software.amazon.awssdk.enhanced.dynamodb.converter.ItemAttributeValueConverter;
-import software.amazon.awssdk.enhanced.dynamodb.internal.converter.ItemAttributeValueConverterChain;
 import software.amazon.awssdk.enhanced.dynamodb.model.ConvertableItemAttributeValue;
-import software.amazon.awssdk.enhanced.dynamodb.model.GeneratedRequestItem;
 import software.amazon.awssdk.enhanced.dynamodb.model.GeneratedResponseItem;
 import software.amazon.awssdk.enhanced.dynamodb.model.ItemAttributeValue;
 import software.amazon.awssdk.enhanced.dynamodb.model.ResponseItem;
@@ -15,12 +12,9 @@ import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
 @SdkInternalApi
 @ThreadSafe
-public class DefaultGeneratedItem extends DefaultItem<AttributeValue> implements GeneratedRequestItem, GeneratedResponseItem {
-    private final ItemAttributeValueConverter converter;
-
-    private DefaultGeneratedItem(Builder builder) {
+public class DefaultGeneratedResponseItem extends DefaultItem<AttributeValue> implements GeneratedResponseItem {
+    private DefaultGeneratedResponseItem(Builder builder) {
         super(builder);
-        this.converter = ItemAttributeValueConverterChain.create(converters());
     }
 
     public static Builder builder() {
@@ -45,7 +39,7 @@ public class DefaultGeneratedItem extends DefaultItem<AttributeValue> implements
     private ConvertableItemAttributeValue toConvertableAttribute(String key, ItemAttributeValue value) {
         return DefaultConvertableItemAttributeValue.builder()
                                                    .conversionContext(cc -> cc.attributeName(key)
-                                                                              .converter(converter))
+                                                                              .converter(converterChain))
                                                    .attributeValue(value)
                                                    .build();
     }
@@ -57,16 +51,16 @@ public class DefaultGeneratedItem extends DefaultItem<AttributeValue> implements
 
     public static class Builder
             extends DefaultItem.Builder<AttributeValue, Builder>
-            implements GeneratedRequestItem.Builder, GeneratedResponseItem.Builder {
+            implements GeneratedResponseItem.Builder {
         private Builder() {}
 
-        private Builder(DefaultGeneratedItem item) {
+        private Builder(DefaultGeneratedResponseItem item) {
             super(item);
         }
 
         @Override
-        public DefaultGeneratedItem build() {
-            return new DefaultGeneratedItem(this);
+        public DefaultGeneratedResponseItem build() {
+            return new DefaultGeneratedResponseItem(this);
         }
     }
 }

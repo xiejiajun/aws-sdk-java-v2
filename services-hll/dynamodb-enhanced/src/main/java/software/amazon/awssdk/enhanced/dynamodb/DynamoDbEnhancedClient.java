@@ -27,7 +27,7 @@ import software.amazon.awssdk.utils.builder.ToCopyableBuilder;
  *
  * Example Usage:
  * <code>
- * // Create a client to use for this example and close it. Usually, this client would be reused throughout the application.
+ * // Create a client to use for this example, and then close it. Usually, one client would be used throughout an application.
  * try (DynamoDbEnhancedClient client = DynamoDbEnhancedClient.create()) {
  *     Table booksTable = client.table("books");
  *     ResponseItem book = booksTable.getItem(...);
@@ -48,6 +48,15 @@ public interface DynamoDbEnhancedClient extends ToCopyableBuilder<DynamoDbEnhanc
      *
      * Equivalent to {@code DynamoDbEnhancedClient.builder().build()}.
      *
+     * Example Usage:
+     * <code>
+     * // Create a client to use for this example, and then close it. Usually, one client would be used throughout an application.
+     * try (DynamoDbEnhancedClient client = DynamoDbEnhancedClient.create()) {
+     *     Table booksTable = client.table("books");
+     *     ResponseItem book = booksTable.getItem(...);
+     * }
+     * </code>
+     *
      * @see #builder()
      */
     static DynamoDbEnhancedClient create() {
@@ -62,6 +71,19 @@ public interface DynamoDbEnhancedClient extends ToCopyableBuilder<DynamoDbEnhanc
      * if one is not configured).
      *
      * Sensible defaults will be used for any values not directly configured.
+     *
+     * Example Usage:
+     * <code>
+     * // Create a client to use for this example, and then close it. Usually, one client would be used throughout an application.
+     * try (DynamoDbEnhancedClient client = DynamoDbEnhancedClient.builder()
+     *                                                            .dynamoDbClient(DynamoDbClient.create())
+     *                                                            .build()) {
+     *     Table booksTable = client.table("books");
+     *     ResponseItem book = booksTable.getItem(...);
+     * }
+     * </code>
+     *
+     * @see #create()
      */
     static DynamoDbEnhancedClient.Builder builder() {
         return DefaultDynamoDbEnhancedClient.builder();
@@ -76,7 +98,7 @@ public interface DynamoDbEnhancedClient extends ToCopyableBuilder<DynamoDbEnhanc
      *
      * Example Usage:
      * <code>
-     * // Create a client to use for this example and close it. Usually, this client would be reused throughout the application.
+     * // Create a client to use for this example, and then close it. Usually, one client would be used throughout an application.
      * try (DynamoDbEnhancedClient client = DynamoDbEnhancedClient.create()) {
      *     Table booksTable = client.table("books");
      *     ResponseItem book = booksTable.getItem(...);
@@ -99,6 +121,17 @@ public interface DynamoDbEnhancedClient extends ToCopyableBuilder<DynamoDbEnhanc
      *
      * Multiple clients can be created by the same builder, but unlike clients the builder <b>is not thread safe</b> and
      * should not be used from multiple threads at the same time.
+     *
+     * Example Usage:
+     * <code>
+     * // Create a client to use for this example, and then close it. Usually, one client would be used throughout an application.
+     * try (DynamoDbEnhancedClient client = DynamoDbEnhancedClient.builder()
+     *                                                            .dynamoDbClient(DynamoDbClient.create())
+     *                                                            .build()) {
+     *     Table booksTable = client.table("books");
+     *     ResponseItem book = booksTable.getItem(...);
+     * }
+     * </code>
      */
     @NotThreadSafe
     interface Builder extends CopyableBuilder<Builder, DynamoDbEnhancedClient>, ConverterAware.Builder {

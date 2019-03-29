@@ -7,12 +7,12 @@ import software.amazon.awssdk.enhanced.dynamodb.internal.converter.ItemAttribute
 import software.amazon.awssdk.enhanced.dynamodb.model.ConverterAware;
 import software.amazon.awssdk.enhanced.dynamodb.model.GeneratedRequestItem;
 import software.amazon.awssdk.enhanced.dynamodb.model.GeneratedResponseItem;
+import software.amazon.awssdk.enhanced.dynamodb.model.ItemKey;
 import software.amazon.awssdk.enhanced.dynamodb.model.RequestItem;
 import software.amazon.awssdk.enhanced.dynamodb.model.ResponseItem;
 import software.amazon.awssdk.enhanced.dynamodb.Table;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.GetItemResponse;
-import software.amazon.awssdk.utils.Logger;
 import software.amazon.awssdk.utils.builder.Buildable;
 
 @SdkInternalApi
@@ -38,8 +38,11 @@ public class DefaultTable implements Table {
     }
 
     @Override
-    public ResponseItem getItem(RequestItem key) {
-        key = addClientConverter(key);
+    public ResponseItem getItem(ItemKey key) {
+        key = key.toBuilder()
+                 .clearConverters()
+                 .addConverter(getConverter(key))
+                 .build();
 
         GeneratedRequestItem generatedKey = key.toGeneratedRequestItem();
 
@@ -56,20 +59,15 @@ public class DefaultTable implements Table {
 
     @Override
     public void putItem(RequestItem item) {
-
-        item = addClientConverter(item);
+        item = item.toBuilder()
+                   .clearConverters()
+                   .addConverter(getConverter(item))
+                   .build();
 
         GeneratedRequestItem generatedRequest = item.toGeneratedRequestItem();
 
         client.putItem(r -> r.tableName(tableName)
                              .item(generatedRequest.attributes()));
-    }
-
-    private RequestItem addClientConverter(RequestItem key) {
-        return key.toBuilder()
-                  .clearConverters()
-                  .addConverter(getConverter(key))
-                  .build();
     }
 
     private ItemAttributeValueConverter getConverter(ConverterAware item) {

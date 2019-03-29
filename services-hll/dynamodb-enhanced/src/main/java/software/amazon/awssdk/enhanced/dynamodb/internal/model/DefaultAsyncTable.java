@@ -9,6 +9,7 @@ import software.amazon.awssdk.enhanced.dynamodb.internal.converter.ItemAttribute
 import software.amazon.awssdk.enhanced.dynamodb.model.ConverterAware;
 import software.amazon.awssdk.enhanced.dynamodb.model.GeneratedRequestItem;
 import software.amazon.awssdk.enhanced.dynamodb.model.GeneratedResponseItem;
+import software.amazon.awssdk.enhanced.dynamodb.model.ItemKey;
 import software.amazon.awssdk.enhanced.dynamodb.model.RequestItem;
 import software.amazon.awssdk.enhanced.dynamodb.model.ResponseItem;
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient;
@@ -37,8 +38,11 @@ public class DefaultAsyncTable implements AsyncTable {
     }
 
     @Override
-    public CompletableFuture<ResponseItem> getItem(RequestItem key) {
-        key = addClientConverter(key);
+    public CompletableFuture<ResponseItem> getItem(ItemKey key) {
+        key = key.toBuilder()
+                 .clearConverters()
+                 .addConverter(getConverter(key))
+                 .build();
 
         GeneratedRequestItem generatedKey = key.toGeneratedRequestItem();
 
@@ -56,20 +60,16 @@ public class DefaultAsyncTable implements AsyncTable {
 
     @Override
     public CompletableFuture<Void> putItem(RequestItem item) {
-        item = addClientConverter(item);
+        item = item.toBuilder()
+                   .clearConverters()
+                   .addConverter(getConverter(item))
+                   .build();
 
         GeneratedRequestItem generatedRequest = item.toGeneratedRequestItem();
 
         return client.putItem(r -> r.tableName(tableName)
                                     .item(generatedRequest.attributes()))
                      .thenApply(r -> null);
-    }
-
-    private RequestItem addClientConverter(RequestItem key) {
-        return key.toBuilder()
-                  .clearConverters()
-                  .addConverter(getConverter(key))
-                  .build();
     }
 
     private ItemAttributeValueConverter getConverter(ConverterAware item) {

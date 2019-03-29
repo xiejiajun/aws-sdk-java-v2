@@ -7,6 +7,8 @@ import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
 import software.amazon.awssdk.enhanced.dynamodb.converter.bundled.InstantConverter;
 import software.amazon.awssdk.enhanced.dynamodb.converter.bundled.StringConverter;
 import software.amazon.awssdk.enhanced.dynamodb.internal.DefaultConverterChain;
+import software.amazon.awssdk.enhanced.dynamodb.model.ConvertableItemAttributeValue;
+import software.amazon.awssdk.enhanced.dynamodb.model.GeneratedResponseItem;
 import software.amazon.awssdk.enhanced.dynamodb.model.ItemAttributeValue;
 import software.amazon.awssdk.enhanced.dynamodb.model.RequestItem;
 import software.amazon.awssdk.enhanced.dynamodb.model.TypeToken;
@@ -24,6 +26,11 @@ import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
  * More specifically, this converts Java types into {@link ItemAttributeValue}s, which are more user-friendly representations of
  * the generated {@link AttributeValue}. An {@link ItemAttributeValue} can always be converted to a generated
  * {@link AttributeValue} using {@link ItemAttributeValue#toGeneratedAttributeValue()}.
+ *
+ * <b>Default Converters</b>
+ *
+ * Most built-in Java types have some defined conversion behavior. The exhaustive list of supported classes can be found in the
+ * {@link DefaultConverterChain}.
  *
  * <b>Converter Precedence</b>
  *
@@ -81,12 +88,33 @@ import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
  * {@code ConversionCondition.isInstanceOf(String.class)} converter added later, assuming they are both configured at the
  * same level ({@link RequestItem} or {@link DynamoDbEnhancedClient}). Indeed, a
  * {@code ConversionCondition.isInstanceOf(Object.class)} configured first at a specific level will result in no other
- * {@code InstanceOf} converters configured at the same level being used.
+ * {@code InstanceOf} converters configured at the same level being used, because all Java types are an instance of Object.
  */
 @SdkPublicApi
 @ThreadSafe
 public interface ItemAttributeValueConverter {
+    /**
+     * The default condition under which this converter will be used. The converter can still be invoked directly, regardless
+     * of this condition, but an exception may be thrown.
+     */
     ConversionCondition defaultConversionCondition();
+
+    /**
+     * Convert the provided Java object into a {@link ItemAttributeValue} that can be persisted in DynamoDB.
+     *
+     * This input object was usually specified as part of a request, such as in
+     * {@link RequestItem.Builder#putAttribute(String, Object)}.
+     */
     ItemAttributeValue toAttributeValue(Object input, ConversionContext context);
+
+
+    /**
+     * Convert the provided {@link ItemAttributeValue} into a Java object that can be used by an application.
+     *
+     * This input value is usually retrieved from DynamoDB, such as in
+     * {@link GeneratedResponseItem.Builder#putAttribute(String, AttributeValue)}.
+     *
+     * The desired type is usually specified by the customer, such as in {@link ConvertableItemAttributeValue#as(Class)}.
+     */
     Object fromAttributeValue(ItemAttributeValue input, TypeToken<?> desiredType, ConversionContext context);
 }

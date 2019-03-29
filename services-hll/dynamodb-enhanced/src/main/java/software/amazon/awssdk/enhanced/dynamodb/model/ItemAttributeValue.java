@@ -6,11 +6,9 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import software.amazon.awssdk.annotations.SdkPublicApi;
 import software.amazon.awssdk.annotations.ThreadSafe;
 import software.amazon.awssdk.core.SdkBytes;
@@ -30,9 +28,9 @@ public final class ItemAttributeValue {
     private final String numberValue;
     private final SdkBytes bytesValue;
     private final Boolean booleanValue;
-    private final Set<String> setOfStringsValue;
-    private final Set<String> setOfNumbersValue;
-    private final Set<SdkBytes> setOfBytesValue;
+    private final List<String> setOfStringsValue;
+    private final List<String> setOfNumbersValue;
+    private final List<SdkBytes> setOfBytesValue;
     private final List<ItemAttributeValue> listOfAttributeValuesValue;
 
     private ItemAttributeValue(InternalBuilder builder) {
@@ -48,13 +46,13 @@ public final class ItemAttributeValue {
                         : Collections.unmodifiableMap(new LinkedHashMap<>(builder.mapValue));
         this.setOfStringsValue = builder.setOfStringsValue == null
                                  ? null
-                                 : Collections.unmodifiableSet(new LinkedHashSet<>(builder.setOfStringsValue));
+                                 : Collections.unmodifiableList(new ArrayList<>(builder.setOfStringsValue));
         this.setOfNumbersValue = builder.setOfNumbersValue == null
                                  ? null
-                                 : Collections.unmodifiableSet(new LinkedHashSet<>(builder.setOfNumbersValue));
+                                 : Collections.unmodifiableList(new ArrayList<>(builder.setOfNumbersValue));
         this.setOfBytesValue = builder.setOfBytesValue == null
                                ? null
-                               : Collections.unmodifiableSet(new LinkedHashSet<>(builder.setOfBytesValue));
+                               : Collections.unmodifiableList(new ArrayList<>(builder.setOfBytesValue));
         this.listOfAttributeValuesValue = builder.listOfAttributeValuesValue == null
                                           ? null
                                           : Collections.unmodifiableList(new ArrayList<>(builder.listOfAttributeValuesValue));
@@ -218,17 +216,17 @@ public final class ItemAttributeValue {
         return booleanValue;
     }
 
-    public Set<String> asSetOfStrings() {
+    public List<String> asSetOfStrings() {
         Validate.isTrue(isSetOfStrings(), "Value is not a list of strings.");
         return setOfStringsValue;
     }
 
-    public Set<String> asSetOfNumbers() {
+    public List<String> asSetOfNumbers() {
         Validate.isTrue(isSetOfNumbers(), "Value is not a list of numbers.");
         return setOfNumbersValue;
     }
 
-    public Set<SdkBytes> asSetOfBytes() {
+    public List<SdkBytes> asSetOfBytes() {
         Validate.isTrue(isSetOfBytes(), "Value is not a list of bytes.");
         return setOfBytesValue;
     }
@@ -338,17 +336,17 @@ public final class ItemAttributeValue {
         }
 
         @Override
-        public AttributeValue convertSetOfStrings(Set<String> value) {
+        public AttributeValue convertSetOfStrings(List<String> value) {
             return AttributeValue.builder().ss(value).build();
         }
 
         @Override
-        public AttributeValue convertSetOfNumbers(Set<String> value) {
+        public AttributeValue convertSetOfNumbers(List<String> value) {
             return AttributeValue.builder().ns(value).build();
         }
 
         @Override
-        public AttributeValue convertSetOfBytes(Set<SdkBytes> value) {
+        public AttributeValue convertSetOfBytes(List<SdkBytes> value) {
             return AttributeValue.builder().bs(value).build();
         }
 

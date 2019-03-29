@@ -64,7 +64,7 @@ public class DefaultDynamoDbEnhancedAsyncClient implements DynamoDbEnhancedAsync
         private Builder() {}
 
         @Override
-        public Builder dynamoDbAsyncClient(DynamoDbAsyncClient client) {
+        public Builder dynamoDbClient(DynamoDbAsyncClient client) {
             this.client = client;
             return this;
         }

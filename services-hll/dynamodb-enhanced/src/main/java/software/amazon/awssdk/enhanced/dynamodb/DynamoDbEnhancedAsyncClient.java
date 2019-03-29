@@ -52,7 +52,7 @@ public interface DynamoDbEnhancedAsyncClient extends ToCopyableBuilder<DynamoDbE
      * This can be created via {@link DynamoDbEnhancedAsyncClient#builder()}.
      */
     interface Builder extends CopyableBuilder<Builder, DynamoDbEnhancedAsyncClient>, ConverterAware.Builder {
-        Builder dynamoDbAsyncClient(DynamoDbAsyncClient client);
+        Builder dynamoDbClient(DynamoDbAsyncClient client);
 
         @Override
         Builder addConverters(Collection<? extends ItemAttributeValueConverter> converters);

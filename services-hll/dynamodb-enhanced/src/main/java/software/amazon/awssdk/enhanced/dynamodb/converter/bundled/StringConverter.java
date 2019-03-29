@@ -4,7 +4,7 @@ import static java.util.stream.Collectors.toList;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
-import java.util.Set;
+import java.util.List;
 import software.amazon.awssdk.annotations.SdkPublicApi;
 import software.amazon.awssdk.annotations.ThreadSafe;
 import software.amazon.awssdk.core.SdkBytes;
@@ -50,17 +50,17 @@ public class StringConverter extends ExactInstanceOfConverter<String> {
             }
 
             @Override
-            public String convertSetOfStrings(Set<String> value) {
+            public String convertSetOfStrings(List<String> value) {
                 return join(value);
             }
 
             @Override
-            public String convertSetOfNumbers(Set<String> value) {
+            public String convertSetOfNumbers(List<String> value) {
                 return join(value);
             }
 
             @Override
-            public String convertSetOfBytes(Set<SdkBytes> value) {
+            public String convertSetOfBytes(List<SdkBytes> value) {
                 Collection<String> values = value.stream()
                                                  .map(b -> b.asString(StandardCharsets.UTF_8))
                                                  .collect(toList());
