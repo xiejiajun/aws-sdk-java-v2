@@ -3,23 +3,24 @@ package software.amazon.awssdk.enhanced.dynamodb.internal;
 import java.util.Collection;
 import software.amazon.awssdk.annotations.SdkInternalApi;
 import software.amazon.awssdk.annotations.ThreadSafe;
+import software.amazon.awssdk.enhanced.dynamodb.AsyncTable;
+import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedAsyncClient;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
 import software.amazon.awssdk.enhanced.dynamodb.converter.ItemAttributeValueConverter;
 import software.amazon.awssdk.enhanced.dynamodb.internal.converter.ItemAttributeValueConverterChain;
-import software.amazon.awssdk.enhanced.dynamodb.internal.model.DefaultTable;
-import software.amazon.awssdk.enhanced.dynamodb.Table;
-import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
+import software.amazon.awssdk.enhanced.dynamodb.internal.model.DefaultAsyncTable;
+import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient;
 
 @SdkInternalApi
 @ThreadSafe
-public class DefaultDynamoDbEnhancedClient implements DynamoDbEnhancedClient {
+public class DefaultDynamoDbEnhancedAsyncClient implements DynamoDbEnhancedAsyncClient {
     private boolean shouldCloseUnderlyingClient;
-    private final DynamoDbClient client;
+    private final DynamoDbAsyncClient client;
     private final ItemAttributeValueConverterChain converter;
 
-    private DefaultDynamoDbEnhancedClient(Builder builder) {
+    private DefaultDynamoDbEnhancedAsyncClient(Builder builder) {
         if (builder.client == null) {
-            this.client = DynamoDbClient.create();
+            this.client = DynamoDbAsyncClient.create();
             this.shouldCloseUnderlyingClient = true;
         } else {
             this.client = builder.client;
@@ -34,12 +35,12 @@ public class DefaultDynamoDbEnhancedClient implements DynamoDbEnhancedClient {
     }
 
     @Override
-    public Table table(String tableName) {
-        return DefaultTable.builder()
-                           .converter(converter)
-                           .dynamoDbClient(client)
-                           .name(tableName)
-                           .build();
+    public AsyncTable table(String tableName) {
+        return DefaultAsyncTable.builder()
+                                .converter(converter)
+                                .dynamoDbAsyncClient(client)
+                                .name(tableName)
+                                .build();
     }
 
     @Override
@@ -54,16 +55,16 @@ public class DefaultDynamoDbEnhancedClient implements DynamoDbEnhancedClient {
         throw new UnsupportedOperationException();
     }
 
-    public static class Builder implements DynamoDbEnhancedClient.Builder {
+    public static class Builder implements DynamoDbEnhancedAsyncClient.Builder {
         private ItemAttributeValueConverterChain.Builder converterChain =
                 ItemAttributeValueConverterChain.builder()
                                                 .parent(DefaultConverterChain.create());
-        private DynamoDbClient client;
+        private DynamoDbAsyncClient client;
 
         private Builder() {}
 
         @Override
-        public Builder dynamoDbClient(DynamoDbClient client) {
+        public Builder dynamoDbAsyncClient(DynamoDbAsyncClient client) {
             this.client = client;
             return this;
         }
@@ -87,8 +88,8 @@ public class DefaultDynamoDbEnhancedClient implements DynamoDbEnhancedClient {
         }
 
         @Override
-        public DynamoDbEnhancedClient build() {
-            return new DefaultDynamoDbEnhancedClient(this);
+        public DynamoDbEnhancedAsyncClient build() {
+            return new DefaultDynamoDbEnhancedAsyncClient(this);
         }
     }
 }

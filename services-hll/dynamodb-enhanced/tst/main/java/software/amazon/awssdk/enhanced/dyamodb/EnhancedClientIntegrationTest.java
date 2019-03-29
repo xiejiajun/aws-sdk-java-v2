@@ -1,8 +1,5 @@
 package software.amazon.awssdk.enhanced.dyamodb;
 
-import static software.amazon.awssdk.enhanced.dynamodb.model.TypeToken.listOf;
-import static software.amazon.awssdk.enhanced.dynamodb.model.TypeToken.mapOf;
-
 import java.time.Instant;
 import java.util.Collections;
 import java.util.HashMap;
@@ -10,9 +7,11 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import software.amazon.awssdk.enhanced.dynamodb.AsyncTable;
+import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedAsyncClient;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
+import software.amazon.awssdk.enhanced.dynamodb.Table;
 import software.amazon.awssdk.enhanced.dynamodb.model.ResponseItem;
-import software.amazon.awssdk.enhanced.dynamodb.model.Table;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.KeyType;
@@ -21,14 +20,14 @@ import software.amazon.awssdk.services.dynamodb.model.ScalarAttributeType;
 import software.amazon.awssdk.services.dynamodb.model.TableStatus;
 import software.amazon.awssdk.testutils.Waiter;
 
-public class DynamoDbEnhancedClientIntegrationTest {
-    private static final String TEST_TABLE = "books";
+public class EnhancedClientIntegrationTest {
+    private static final String TABLE = "books";
     private static final DynamoDbClient dynamo = DynamoDbClient.create();
 
     @BeforeClass
     public static void setup() {
         try {
-            dynamo.createTable(r -> r.tableName(TEST_TABLE)
+            dynamo.createTable(r -> r.tableName(TABLE)
                                      .keySchema(k -> k.attributeName("isbn").keyType(KeyType.HASH))
                                      .attributeDefinitions(a -> a.attributeName("isbn").attributeType(ScalarAttributeType.S))
                                      .provisionedThroughput(t -> t.readCapacityUnits(5L)
@@ -39,7 +38,7 @@ public class DynamoDbEnhancedClientIntegrationTest {
 
         System.out.println("Waiting for table to be active...");
 
-        Waiter.run(() -> dynamo.describeTable(r -> r.tableName(TEST_TABLE)))
+        Waiter.run(() -> dynamo.describeTable(r -> r.tableName(TABLE)))
               .until(r -> r.table().tableStatus().equals(TableStatus.ACTIVE))
               .orFail();
     }
@@ -51,7 +50,7 @@ public class DynamoDbEnhancedClientIntegrationTest {
 
             System.out.println("Putting item...");
 
-            books.putItem(r -> r.putAttribute("isbn", "0-330-25864-8")
+            books.putItem(i -> i.putAttribute("isbn", "0-330-25864-8")
                                 .putAttribute("title", "The Hitchhiker's Guide to the Galaxy")
                                 .putAttribute("publicationDate", p -> p.putAttribute("UK", Instant.parse("1979-10-12T00:00:00Z"))
                                                                        .putAttribute("US", Instant.parse("1980-01-01T00:00:00Z")))
@@ -63,10 +62,38 @@ public class DynamoDbEnhancedClientIntegrationTest {
 
             ResponseItem book = books.getItem(r -> r.putAttribute("isbn", "0-330-25864-8"));
 
-            System.out.println("ISBN: " + book.attribute("isbn").as(String.class) + "\n" +
-                               "Title: " + book.attribute("title").as(String.class) + "\n" +
-                               "Publication Dates: " + book.attribute("publicationDate").as(mapOf(String.class, Instant.class)) + "\n" +
-                               "Authors: " + book.attribute("authors").as(listOf(String.class)));
+            System.out.println("ISBN: " + book.attribute("isbn").asString() + "\n" +
+                               "Title: " + book.attribute("title").asString() + "\n" +
+                               "Publication Dates: " + book.attribute("publicationDate").asMap(String.class, Instant.class) + "\n" +
+                               "Authors: " + book.attribute("authors").asList(String.class));
+        }
+    }
+
+    @Test
+    public void getCanReadTheResultOfPutAsync() throws InterruptedException {
+        try (DynamoDbEnhancedAsyncClient client = DynamoDbEnhancedAsyncClient.create()) {
+            AsyncTable books = client.table("books");
+
+            System.out.println("Putting item...");
+
+            books.putItem(i -> i.putAttribute("isbn", "0-330-25864-8")
+                                .putAttribute("title", "The Hitchhiker's Guide to the Galaxy")
+                                .putAttribute("publicationDate", p -> p.putAttribute("UK", Instant.parse("1979-10-12T00:00:00Z"))
+                                                                       .putAttribute("US", Instant.parse("1980-01-01T00:00:00Z")))
+                                .putAttribute("authors", Collections.singletonList("Douglas Adams")))
+                 .join();
+
+            Thread.sleep(5_000);
+
+            System.out.println("Getting item...");
+
+            ResponseItem book = books.getItem(r -> r.putAttribute("isbn", "0-330-25864-8"))
+                                     .join();
+
+            System.out.println("ISBN: " + book.attribute("isbn").asString() + "\n" +
+                               "Title: " + book.attribute("title").asString() + "\n" +
+                               "Publication Dates: " + book.attribute("publicationDate").asMap(String.class, Instant.class) + "\n" +
+                               "Authors: " + book.attribute("authors").asList(String.class));
         }
     }
 
@@ -85,16 +112,16 @@ public class DynamoDbEnhancedClientIntegrationTest {
             requestItem.put("publicationDate", AttributeValue.builder().m(publicationDate).build());
             requestItem.put("authors", AttributeValue.builder().ss("Douglas Adams").build());
 
-            client.putItem(r -> r.tableName(TEST_TABLE).item(requestItem));
+            client.putItem(r -> r.tableName(TABLE).item(requestItem));
 
             Thread.sleep(5_000);
 
             System.out.println("Getting item...");
 
             Map<String, AttributeValue> key = new HashMap<>();
-            requestItem.put("isbn", AttributeValue.builder().s("0-330-25864-8").build());
+            key.put("isbn", AttributeValue.builder().s("0-330-25864-8").build());
 
-            Map<String, AttributeValue> book = client.getItem(r -> r.tableName(TEST_TABLE).key(key)).item();
+            Map<String, AttributeValue> book = client.getItem(r -> r.tableName(TABLE).key(key)).item();
 
             Map<String, Instant> publicationDates = new LinkedHashMap<>();
             book.get("publicationDate").m().forEach((k, v) -> publicationDates.put(k, Instant.ofEpochMilli(Long.parseLong(v.n()))));

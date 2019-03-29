@@ -65,6 +65,10 @@ public class TypeToken<T> {
         this.representedClassParameters = loadRepresentedClassParameters();
     }
 
+    public static TypeToken<?> from(Type type) {
+        return new TypeToken<>(Validate.paramNotNull(type, "type"));
+    }
+
     public static <T> TypeToken<T> from(Class<T> type) {
         return new TypeToken<>(Validate.paramNotNull(type, "type"));
     }
@@ -75,10 +79,6 @@ public class TypeToken<T> {
 
     public static <T, U> TypeToken<Map<T, U>> mapOf(Class<T> keyType, Class<U> valueType) {
         return new TypeToken<>(DefaultParameterizedType.parameterizedType(Map.class, keyType, valueType));
-    }
-
-    public static TypeToken<?> from(Type type) {
-        return new TypeToken<>(Validate.paramNotNull(type, "type"));
     }
 
     private static Type validateIsSupportedType(Type type) {
