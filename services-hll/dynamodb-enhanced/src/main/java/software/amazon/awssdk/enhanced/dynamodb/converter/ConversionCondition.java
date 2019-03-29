@@ -4,7 +4,6 @@ import software.amazon.awssdk.annotations.SdkPublicApi;
 import software.amazon.awssdk.annotations.ThreadSafe;
 import software.amazon.awssdk.enhanced.dynamodb.internal.converter.ExactInstanceOfConversionCondition;
 import software.amazon.awssdk.enhanced.dynamodb.internal.converter.InstanceOfConversionCondition;
-import software.amazon.awssdk.enhanced.dynamodb.internal.converter.NeverConversionCondition;
 
 @SdkPublicApi
 @ThreadSafe
@@ -15,9 +14,5 @@ public interface ConversionCondition {
 
     static ConversionCondition isInstanceOf(Class<?> clazz) {
         return new InstanceOfConversionCondition(clazz);
-    }
-
-    static ConversionCondition never() {
-        return new NeverConversionCondition();
     }
 }

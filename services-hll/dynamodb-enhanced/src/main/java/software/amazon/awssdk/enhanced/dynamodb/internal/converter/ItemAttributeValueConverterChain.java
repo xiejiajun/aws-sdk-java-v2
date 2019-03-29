@@ -36,7 +36,7 @@ public final class ItemAttributeValueConverterChain implements ItemAttributeValu
 
             if (condition instanceof ExactInstanceOfConversionCondition) {
                 ExactInstanceOfConversionCondition exactCondition = (ExactInstanceOfConversionCondition) condition;
-                this.converterCache.put(exactCondition.convertedClass(), converter);
+                this.converterCache.putIfAbsent(exactCondition.convertedClass(), converter);
             }
         }
 

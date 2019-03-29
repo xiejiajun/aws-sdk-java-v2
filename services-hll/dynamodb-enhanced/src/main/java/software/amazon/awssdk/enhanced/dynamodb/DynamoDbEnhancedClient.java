@@ -1,6 +1,8 @@
 package software.amazon.awssdk.enhanced.dynamodb;
 
 import java.util.Collection;
+import software.amazon.awssdk.annotations.Immutable;
+import software.amazon.awssdk.annotations.NotThreadSafe;
 import software.amazon.awssdk.annotations.SdkPublicApi;
 import software.amazon.awssdk.annotations.ThreadSafe;
 import software.amazon.awssdk.enhanced.dynamodb.converter.ItemAttributeValueConverter;
@@ -12,23 +14,41 @@ import software.amazon.awssdk.utils.builder.CopyableBuilder;
 import software.amazon.awssdk.utils.builder.ToCopyableBuilder;
 
 /**
- * A synchronous client for interacting with DynamoDB. This can be created using the static {@link #builder()} method.
+ * A synchronous client for interacting with DynamoDB.
  *
- * In most cases, this is the correct client to use for interacting with DynamoDB. The low-level {@link DynamoDbClient} is
- * generated automatically and includes the latest service features. This client is hand-written and provides a richer,
- * Java-optimized experience for DynamoDB.
+ * The enhanced DynamoDB client replaces the generated {@link DynamoDbClient} with one that is easier for a Java customer to
+ * use. It does this by converting between Java built-in types (eg. java.time.Instant) and DynamoDB attribute value types.
+ *
+ * This can be created using the static {@link #builder()} or {@link #create()} methods. The client must be {@link #close()}d
+ * when it is done being used.
+ *
+ * A {@code DynamoDbEnhancedClient} is thread-safe and relatively expensive to create. It's strongly advised to create a single
+ * {@code DynamoDbEnhancedClient} instance that is reused throughout your whole application.
+ *
+ * Example Usage:
+ * <code>
+ * // Create a client to use for this example and close it. Usually, this client would be reused throughout the application.
+ * try (DynamoDbEnhancedClient client = DynamoDbEnhancedClient.create()) {
+ *     Table booksTable = client.table("books");
+ *     ResponseItem book = booksTable.getItem(...);
+ * }
+ * </code>
+ *
+ * @see DynamoDbEnhancedAsyncClient
  */
 @SdkPublicApi
 @ThreadSafe
+@Immutable
 public interface DynamoDbEnhancedClient extends ToCopyableBuilder<DynamoDbEnhancedClient.Builder, DynamoDbEnhancedClient>,
                                                 SdkAutoCloseable {
     /**
      * Create a {@link DynamoDbEnhancedClient} with default configuration.
      *
-     * Equivalent statements:
-     * <ol>
-     *     <li>{@code DynamoDbEnhancedClient.builder().build()}</li>
-     * </ol>
+     * The credentials and region will be loaded automatically, using the same semantics as {@link DynamoDbClient#create()}.
+     *
+     * Equivalent to {@code DynamoDbEnhancedClient.builder().build()}.
+     *
+     * @see #builder()
      */
     static DynamoDbEnhancedClient create() {
         return builder().build();
@@ -37,20 +57,61 @@ public interface DynamoDbEnhancedClient extends ToCopyableBuilder<DynamoDbEnhanc
     /**
      * Create a {@link DynamoDbEnhancedClient.Builder} that can be used to create a {@link DynamoDbEnhancedClient} with custom
      * configuration.
+     *
+     * The credentials and region will be loaded from the configured {@link DynamoDbClient} (or {@link DynamoDbClient#create()}
+     * if one is not configured).
+     *
+     * Sensible defaults will be used for any values not directly configured.
      */
     static DynamoDbEnhancedClient.Builder builder() {
         return DefaultDynamoDbEnhancedClient.builder();
     }
 
+    /**
+     * Create a {@link Table} that can be used for interacting with DynamoDB. This does not make any remote calls, and as a result
+     * does not validate that the requested table actually exists.
+     *
+     * If the table does not exist, exceptions will be thrown when trying to load or retrieve data from the returned
+     * {@link Table} object. The returned {@link Table} will stop working if the enhanced client is {@link #close()}d.
+     *
+     * Example Usage:
+     * <code>
+     * // Create a client to use for this example and close it. Usually, this client would be reused throughout the application.
+     * try (DynamoDbEnhancedClient client = DynamoDbEnhancedClient.create()) {
+     *     Table booksTable = client.table("books");
+     *     ResponseItem book = booksTable.getItem(...);
+     * }
+     * </code>
+     */
     Table table(String tableName);
 
     /**
-     * The builder for the high-level DynamoDB client. This is used by customers to configure the high-level client with default
-     * values to be applied across all client operations.
-     *
-     * This can be created via {@link DynamoDbEnhancedClient#builder()}.
+     * Close this client, and release all resources it is using. If a client was configured with
+     * {@link Builder#dynamoDbClient(DynamoDbClient)}, it <b>will not</b> be closed, and <b>must</b> be closed separately.
      */
+    @Override
+    void close();
+
+    /**
+     * A builder for {@link DynamoDbEnhancedClient}.
+     *
+     * This can be created using the static {@link DynamoDbEnhancedClient#builder()} method.
+     *
+     * Multiple clients can be created by the same builder, but unlike clients the builder <b>is not thread safe</b> and
+     * should not be used from multiple threads at the same time.
+     */
+    @NotThreadSafe
     interface Builder extends CopyableBuilder<Builder, DynamoDbEnhancedClient>, ConverterAware.Builder {
+        /**
+         * Configure a generated client to be used by the enhanced client to interact with DynamoDB. The enhanced client
+         * will use the credentials and region of the provided generated client.
+         *
+         * The provided client <b>will not be closed</b> when {@link DynamoDbEnhancedClient#close()} is invoked, and <b>must</b>
+         * be closed separately when it is done being used to prevent leaking resources.
+         *
+         * If this is not configured, {@link DynamoDbClient#create()} will be used (and cleaned up with
+         * {@link DynamoDbEnhancedClient#close()}).
+         */
         Builder dynamoDbClient(DynamoDbClient client);
 
         @Override
@@ -62,6 +123,10 @@ public interface DynamoDbEnhancedClient extends ToCopyableBuilder<DynamoDbEnhanc
         @Override
         Builder clearConverters();
 
+        /**
+         * Build a {@link DynamoDbEnhancedClient} from the provided configuration. This method can be invoked multiple times to
+         * create multiple {@link DynamoDbEnhancedClient} instances.
+         */
         DynamoDbEnhancedClient build();
     }
 }
