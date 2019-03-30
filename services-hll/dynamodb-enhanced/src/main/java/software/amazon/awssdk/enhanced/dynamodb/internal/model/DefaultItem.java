@@ -12,13 +12,11 @@ import software.amazon.awssdk.enhanced.dynamodb.converter.ItemAttributeValueConv
 import software.amazon.awssdk.enhanced.dynamodb.internal.converter.ItemAttributeValueConverterChain;
 import software.amazon.awssdk.enhanced.dynamodb.model.AttributeAware;
 import software.amazon.awssdk.enhanced.dynamodb.model.ConverterAware;
-import software.amazon.awssdk.enhanced.dynamodb.model.ItemKeyAware;
 
 @SdkInternalApi
 @ThreadSafe
 public abstract class DefaultItem<AttributeT> implements ConverterAware,
-                                                         AttributeAware<AttributeT>,
-                                                         ItemKeyAware<AttributeT> {
+                                                         AttributeAware<AttributeT> {
     private final Map<String, AttributeT> attributes;
     private final List<ItemAttributeValueConverter> converters;
     protected final ItemAttributeValueConverterChain converterChain;
@@ -26,27 +24,17 @@ public abstract class DefaultItem<AttributeT> implements ConverterAware,
     protected DefaultItem(Builder<AttributeT, ?> builder) {
         this.converters = new ArrayList<>(builder.converters);
         this.converterChain = ItemAttributeValueConverterChain.create(converters());
-        this.attributes = new LinkedHashMap<>(builder.attributes);
+        this.attributes = Collections.unmodifiableMap(new LinkedHashMap<>(builder.attributes));
     }
 
     @Override
     public Map<String, AttributeT> attributes() {
-        return Collections.unmodifiableMap(attributes);
+        return attributes;
     }
 
     @Override
     public AttributeT attribute(String attributeKey) {
         return attributes.get(attributeKey);
-    }
-
-    @Override
-    public Map<String, AttributeT> keyAttributes() {
-        return attributes();
-    }
-
-    @Override
-    public AttributeT keyAttribute(String attributeKey) {
-        return attribute(attributeKey);
     }
 
     @Override
@@ -56,8 +44,7 @@ public abstract class DefaultItem<AttributeT> implements ConverterAware,
 
     public static abstract class Builder<AttributeT, BuilderT extends Builder<AttributeT, BuilderT>>
             implements ConverterAware.Builder,
-                       AttributeAware.Builder<AttributeT>,
-                       ItemKeyAware.Builder<AttributeT> {
+                       AttributeAware.Builder<AttributeT> {
         private Map<String, AttributeT> attributes = new LinkedHashMap<>();
         private List<ItemAttributeValueConverter> converters = new ArrayList<>();
 
@@ -90,26 +77,6 @@ public abstract class DefaultItem<AttributeT> implements ConverterAware,
         public BuilderT clearAttributes() {
             this.attributes.clear();
             return (BuilderT) this;
-        }
-
-        @Override
-        public BuilderT putKeyAttributes(Map<String, AttributeT> attributeValues) {
-            return putAttributes(attributeValues);
-        }
-
-        @Override
-        public BuilderT putKeyAttribute(String attributeKey, AttributeT attributeValue) {
-            return putAttribute(attributeKey, attributeValue);
-        }
-
-        @Override
-        public BuilderT removeKeyAttribute(String attributeKey) {
-            return removeAttribute(attributeKey);
-        }
-
-        @Override
-        public BuilderT clearKeyAttributes() {
-            return clearAttributes();
         }
 
         @Override

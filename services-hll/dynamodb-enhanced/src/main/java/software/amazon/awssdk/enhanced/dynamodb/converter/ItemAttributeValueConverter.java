@@ -6,7 +6,6 @@ import software.amazon.awssdk.annotations.ThreadSafe;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
 import software.amazon.awssdk.enhanced.dynamodb.converter.bundled.InstantConverter;
 import software.amazon.awssdk.enhanced.dynamodb.converter.bundled.StringConverter;
-import software.amazon.awssdk.enhanced.dynamodb.internal.DefaultConverterChain;
 import software.amazon.awssdk.enhanced.dynamodb.model.ConvertableItemAttributeValue;
 import software.amazon.awssdk.enhanced.dynamodb.model.GeneratedResponseItem;
 import software.amazon.awssdk.enhanced.dynamodb.model.ItemAttributeValue;
@@ -106,7 +105,6 @@ public interface ItemAttributeValueConverter {
      * {@link RequestItem.Builder#putAttribute(String, Object)}.
      */
     ItemAttributeValue toAttributeValue(Object input, ConversionContext context);
-
 
     /**
      * Convert the provided {@link ItemAttributeValue} into a Java object that can be used by an application.

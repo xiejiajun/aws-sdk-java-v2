@@ -7,10 +7,13 @@ import software.amazon.awssdk.enhanced.dynamodb.internal.converter.ExactInstance
 import software.amazon.awssdk.enhanced.dynamodb.model.ItemAttributeValue;
 import software.amazon.awssdk.enhanced.dynamodb.model.TypeToken;
 
+/**
+ * Identity converter, allowing a customer to specify or request an {@link ItemAttributeValue} directly.
+ */
 @SdkPublicApi
 @ThreadSafe
-public class AttributeConverter extends ExactInstanceOfConverter<ItemAttributeValue> {
-    public AttributeConverter() {
+public class IdentityConverter extends ExactInstanceOfConverter<ItemAttributeValue> {
+    public IdentityConverter() {
         super(ItemAttributeValue.class);
     }
 

@@ -13,6 +13,9 @@ import software.amazon.awssdk.enhanced.dynamodb.model.ResponseItem;
 import software.amazon.awssdk.enhanced.dynamodb.model.TypeConvertingVisitor;
 import software.amazon.awssdk.enhanced.dynamodb.model.TypeToken;
 
+/**
+ * A converter between {@link ResponseItem} and {@link ItemAttributeValue}.
+ */
 @SdkPublicApi
 @ThreadSafe
 public class ResponseItemConverter extends ExactInstanceOfConverter<ResponseItem> {

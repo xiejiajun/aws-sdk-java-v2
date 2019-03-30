@@ -14,6 +14,9 @@ import software.amazon.awssdk.enhanced.dynamodb.model.TypeConvertingVisitor;
 import software.amazon.awssdk.enhanced.dynamodb.model.TypeToken;
 import software.amazon.awssdk.utils.Validate;
 
+/**
+ * A converter between {@link Map} subtypes and {@link ItemAttributeValue}.
+ */
 @SdkPublicApi
 @ThreadSafe
 public class MapConverter extends InstanceOfConverter<Map<?, ?>> {

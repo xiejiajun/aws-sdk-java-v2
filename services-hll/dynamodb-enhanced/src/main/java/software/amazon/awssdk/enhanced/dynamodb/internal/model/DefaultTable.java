@@ -7,7 +7,7 @@ import software.amazon.awssdk.enhanced.dynamodb.internal.converter.ItemAttribute
 import software.amazon.awssdk.enhanced.dynamodb.model.ConverterAware;
 import software.amazon.awssdk.enhanced.dynamodb.model.GeneratedRequestItem;
 import software.amazon.awssdk.enhanced.dynamodb.model.GeneratedResponseItem;
-import software.amazon.awssdk.enhanced.dynamodb.model.ItemKey;
+import software.amazon.awssdk.enhanced.dynamodb.model.RequestItem;
 import software.amazon.awssdk.enhanced.dynamodb.model.RequestItem;
 import software.amazon.awssdk.enhanced.dynamodb.model.ResponseItem;
 import software.amazon.awssdk.enhanced.dynamodb.Table;
@@ -38,10 +38,11 @@ public class DefaultTable implements Table {
     }
 
     @Override
-    public ResponseItem getItem(ItemKey key) {
+    public ResponseItem getItem(RequestItem key) {
+        ItemAttributeValueConverter itemConverterChain = getConverter(key);
         key = key.toBuilder()
                  .clearConverters()
-                 .addConverter(getConverter(key))
+                 .addConverter(itemConverterChain)
                  .build();
 
         GeneratedRequestItem generatedKey = key.toGeneratedRequestItem();
@@ -51,7 +52,7 @@ public class DefaultTable implements Table {
 
         GeneratedResponseItem generatedResponse = GeneratedResponseItem.builder()
                                                                        .putAttributes(response.item())
-                                                                       .addConverter(converter)
+                                                                       .addConverter(itemConverterChain)
                                                                        .build();
 
         return generatedResponse.toResponseItem();

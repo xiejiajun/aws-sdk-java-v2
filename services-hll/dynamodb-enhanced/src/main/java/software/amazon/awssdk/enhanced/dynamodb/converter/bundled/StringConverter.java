@@ -14,6 +14,9 @@ import software.amazon.awssdk.enhanced.dynamodb.model.ItemAttributeValue;
 import software.amazon.awssdk.enhanced.dynamodb.model.TypeConvertingVisitor;
 import software.amazon.awssdk.enhanced.dynamodb.model.TypeToken;
 
+/**
+ * A converter between {@link String} and {@link ItemAttributeValue}.
+ */
 @SdkPublicApi
 @ThreadSafe
 public class StringConverter extends ExactInstanceOfConverter<String> {

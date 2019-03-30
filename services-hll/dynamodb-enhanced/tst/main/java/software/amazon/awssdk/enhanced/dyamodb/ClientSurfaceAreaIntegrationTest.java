@@ -18,7 +18,6 @@ import software.amazon.awssdk.enhanced.dynamodb.converter.ItemAttributeValueConv
 import software.amazon.awssdk.enhanced.dynamodb.model.ConvertableItemAttributeValue;
 import software.amazon.awssdk.enhanced.dynamodb.model.ItemAttributeValue;
 import software.amazon.awssdk.enhanced.dynamodb.model.ItemAttributeValueType;
-import software.amazon.awssdk.enhanced.dynamodb.model.ItemKey;
 import software.amazon.awssdk.enhanced.dynamodb.model.RequestItem;
 import software.amazon.awssdk.enhanced.dynamodb.model.ResponseItem;
 import software.amazon.awssdk.enhanced.dynamodb.model.TypeConvertingVisitor;
@@ -107,15 +106,15 @@ public class ClientSurfaceAreaIntegrationTest {
 
         // Get Item
 
-        booksTable.getItem(ItemKey.builder()
+        booksTable.getItem(RequestItem.builder()
 
                                   // Same methods as PutItem
-                                  .putKeyAttribute("isbn", "0-330-25864-8")
+                                  .putAttribute("isbn", "0-330-25864-8")
                                   .addConverter(new InstantAsStringConverter())
 
                                   .build());
 
-        ResponseItem book = booksTable.getItem(key -> key.putKeyAttribute("isbn", "0-330-25864-8"));
+        ResponseItem book = booksTable.getItem(key -> key.putAttribute("isbn", "0-330-25864-8"));
 
 
         // RESPONSE ITEM USAGE
@@ -202,7 +201,7 @@ public class ClientSurfaceAreaIntegrationTest {
         // Get Item
 
         CompletableFuture<ResponseItem> getCompleteFuture =
-                booksTable.getItem(ItemKey.builder()
+                booksTable.getItem(RequestItem.builder()
                                           // ...
                                           .build());
     }

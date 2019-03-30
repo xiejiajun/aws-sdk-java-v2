@@ -9,7 +9,6 @@ import software.amazon.awssdk.enhanced.dynamodb.internal.converter.ItemAttribute
 import software.amazon.awssdk.enhanced.dynamodb.model.ConverterAware;
 import software.amazon.awssdk.enhanced.dynamodb.model.GeneratedRequestItem;
 import software.amazon.awssdk.enhanced.dynamodb.model.GeneratedResponseItem;
-import software.amazon.awssdk.enhanced.dynamodb.model.ItemKey;
 import software.amazon.awssdk.enhanced.dynamodb.model.RequestItem;
 import software.amazon.awssdk.enhanced.dynamodb.model.ResponseItem;
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient;
@@ -38,10 +37,11 @@ public class DefaultAsyncTable implements AsyncTable {
     }
 
     @Override
-    public CompletableFuture<ResponseItem> getItem(ItemKey key) {
+    public CompletableFuture<ResponseItem> getItem(RequestItem key) {
+        ItemAttributeValueConverter itemConverterChain = getConverter(key);
         key = key.toBuilder()
                  .clearConverters()
-                 .addConverter(getConverter(key))
+                 .addConverter(itemConverterChain)
                  .build();
 
         GeneratedRequestItem generatedKey = key.toGeneratedRequestItem();
@@ -51,7 +51,7 @@ public class DefaultAsyncTable implements AsyncTable {
                      .thenApply(response -> {
                          GeneratedResponseItem generatedResponse = GeneratedResponseItem.builder()
                                                                                         .putAttributes(response.item())
-                                                                                        .addConverter(converter)
+                                                                                        .addConverter(itemConverterChain)
                                                                                         .build();
                          return generatedResponse.toResponseItem();
                      });

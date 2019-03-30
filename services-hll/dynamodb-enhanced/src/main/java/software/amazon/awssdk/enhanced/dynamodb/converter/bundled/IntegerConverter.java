@@ -8,6 +8,9 @@ import software.amazon.awssdk.enhanced.dynamodb.model.ItemAttributeValue;
 import software.amazon.awssdk.enhanced.dynamodb.model.TypeConvertingVisitor;
 import software.amazon.awssdk.enhanced.dynamodb.model.TypeToken;
 
+/**
+ * A converter between {@link Integer} and {@link ItemAttributeValue}.
+ */
 @SdkPublicApi
 @ThreadSafe
 public class IntegerConverter extends ExactInstanceOfConverter<Integer> {

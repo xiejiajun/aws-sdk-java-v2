@@ -63,7 +63,7 @@ public class EnhancedClientIntegrationTest {
 
             System.out.println("Getting item...");
 
-            ResponseItem book = books.getItem(key -> key.putKeyAttribute("isbn", "0-330-25864-8"));
+            ResponseItem book = books.getItem(key -> key.putAttribute("isbn", "0-330-25864-8"));
 
             System.out.println("ISBN: " + book.attribute("isbn").asString() + "\n" +
                                "Title: " + book.attribute("title").asString() + "\n" +
@@ -92,7 +92,7 @@ public class EnhancedClientIntegrationTest {
 
             System.out.println("Getting item...");
 
-            ResponseItem book = books.getItem(r -> r.putKeyAttribute("isbn", "0-330-25864-8"))
+            ResponseItem book = books.getItem(r -> r.putAttribute("isbn", "0-330-25864-8"))
                                      .join();
 
             System.out.println("ISBN: " + book.attribute("isbn").asString() + "\n" +

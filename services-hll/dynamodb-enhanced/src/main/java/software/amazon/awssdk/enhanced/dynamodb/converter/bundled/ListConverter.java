@@ -16,6 +16,9 @@ import software.amazon.awssdk.enhanced.dynamodb.model.TypeConvertingVisitor;
 import software.amazon.awssdk.enhanced.dynamodb.model.TypeToken;
 import software.amazon.awssdk.utils.Validate;
 
+/**
+ * A converter between {@link List} subtypes and {@link ItemAttributeValue}.
+ */
 @SdkPublicApi
 @ThreadSafe
 public class ListConverter extends InstanceOfConverter<List<?>> {

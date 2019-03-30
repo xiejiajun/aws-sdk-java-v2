@@ -1,6 +1,7 @@
 package software.amazon.awssdk.enhanced.dynamodb.converter.bundled;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import software.amazon.awssdk.annotations.SdkPublicApi;
 import software.amazon.awssdk.annotations.ThreadSafe;
@@ -12,6 +13,9 @@ import software.amazon.awssdk.enhanced.dynamodb.model.ItemAttributeValue;
 import software.amazon.awssdk.enhanced.dynamodb.model.RequestItem;
 import software.amazon.awssdk.enhanced.dynamodb.model.TypeToken;
 
+/**
+ * A converter between {@link RequestItem} and {@link ItemAttributeValue}.
+ */
 @SdkPublicApi
 @ThreadSafe
 public class RequestItemConverter extends InstanceOfConverter<RequestItem> {

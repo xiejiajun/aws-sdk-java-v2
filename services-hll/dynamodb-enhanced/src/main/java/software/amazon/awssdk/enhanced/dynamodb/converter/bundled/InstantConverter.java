@@ -9,6 +9,10 @@ import software.amazon.awssdk.enhanced.dynamodb.model.ItemAttributeValue;
 import software.amazon.awssdk.enhanced.dynamodb.model.TypeConvertingVisitor;
 import software.amazon.awssdk.enhanced.dynamodb.model.TypeToken;
 
+/**
+ * A converter between {@link Instant} and {@link ItemAttributeValue}. Times are stored in DynamoDB as a number
+ * (Unix epoch millis) so that they can be sorted.
+ */
 @SdkPublicApi
 @ThreadSafe
 public class InstantConverter extends ExactInstanceOfConverter<Instant> {

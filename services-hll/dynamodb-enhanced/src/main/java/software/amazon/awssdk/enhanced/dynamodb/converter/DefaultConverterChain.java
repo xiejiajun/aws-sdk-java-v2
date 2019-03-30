@@ -1,11 +1,11 @@
-package software.amazon.awssdk.enhanced.dynamodb.internal;
+package software.amazon.awssdk.enhanced.dynamodb.converter;
 
 import software.amazon.awssdk.annotations.SdkInternalApi;
+import software.amazon.awssdk.annotations.SdkPublicApi;
 import software.amazon.awssdk.annotations.ThreadSafe;
-import software.amazon.awssdk.enhanced.dynamodb.converter.ConversionCondition;
-import software.amazon.awssdk.enhanced.dynamodb.converter.ConversionContext;
-import software.amazon.awssdk.enhanced.dynamodb.converter.ItemAttributeValueConverter;
-import software.amazon.awssdk.enhanced.dynamodb.converter.bundled.AttributeConverter;
+import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedAsyncClient;
+import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
+import software.amazon.awssdk.enhanced.dynamodb.converter.bundled.IdentityConverter;
 import software.amazon.awssdk.enhanced.dynamodb.converter.bundled.InstantConverter;
 import software.amazon.awssdk.enhanced.dynamodb.converter.bundled.IntegerConverter;
 import software.amazon.awssdk.enhanced.dynamodb.converter.bundled.ListConverter;
@@ -17,9 +17,16 @@ import software.amazon.awssdk.enhanced.dynamodb.internal.converter.ItemAttribute
 import software.amazon.awssdk.enhanced.dynamodb.model.ItemAttributeValue;
 import software.amazon.awssdk.enhanced.dynamodb.model.TypeToken;
 
-@SdkInternalApi
+/**
+ * A {@link ItemAttributeValueConverter} that includes all of the converters built into the SDK.
+ *
+ * This is the root converter for all created {@link DynamoDbEnhancedClient}s and {@link DynamoDbEnhancedAsyncClient}s.
+ *
+ * This can be created via {@link #create()}.
+ */
+@SdkPublicApi
 @ThreadSafe
-public class DefaultConverterChain implements ItemAttributeValueConverter {
+public final class DefaultConverterChain implements ItemAttributeValueConverter {
     private static final ItemAttributeValueConverter CHAIN;
 
     static {
@@ -31,12 +38,15 @@ public class DefaultConverterChain implements ItemAttributeValueConverter {
                                                 .addConverter(new MapConverter())
                                                 .addConverter(new RequestItemConverter())
                                                 .addConverter(new ResponseItemConverter())
-                                                .addConverter(new AttributeConverter())
+                                                .addConverter(new IdentityConverter())
                                                 .build();
     }
 
     private DefaultConverterChain() {}
 
+    /**
+     * Create a default convert chain that contains all of the converters built into the SDK.
+     */
     public static DefaultConverterChain create() {
         return new DefaultConverterChain();
     }

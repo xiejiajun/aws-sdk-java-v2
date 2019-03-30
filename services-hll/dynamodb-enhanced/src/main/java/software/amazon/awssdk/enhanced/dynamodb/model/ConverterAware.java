@@ -3,11 +3,9 @@ package software.amazon.awssdk.enhanced.dynamodb.model;
 import java.util.Collection;
 import java.util.List;
 import software.amazon.awssdk.annotations.SdkPublicApi;
-import software.amazon.awssdk.annotations.ThreadSafe;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
 import software.amazon.awssdk.enhanced.dynamodb.converter.ItemAttributeValueConverter;
-import software.amazon.awssdk.enhanced.dynamodb.internal.DefaultConverterChain;
-import software.amazon.awssdk.utils.Validate;
+import software.amazon.awssdk.enhanced.dynamodb.converter.DefaultConverterChain;
 
 /**
  * An interface applied to all objects that wish to expose their underlying {@link ItemAttributeValueConverter}s.

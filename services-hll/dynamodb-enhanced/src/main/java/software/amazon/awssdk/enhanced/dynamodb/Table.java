@@ -3,7 +3,7 @@ package software.amazon.awssdk.enhanced.dynamodb;
 import java.util.function.Consumer;
 import software.amazon.awssdk.annotations.SdkPublicApi;
 import software.amazon.awssdk.annotations.ThreadSafe;
-import software.amazon.awssdk.enhanced.dynamodb.model.ItemKey;
+import software.amazon.awssdk.enhanced.dynamodb.model.RequestItem;
 import software.amazon.awssdk.enhanced.dynamodb.model.RequestItem;
 import software.amazon.awssdk.enhanced.dynamodb.model.ResponseItem;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
@@ -105,7 +105,7 @@ public interface Table {
      * }
      * </code>
      */
-    default ResponseItem getItem(ItemKey key) {
+    default ResponseItem getItem(RequestItem key) {
         throw new UnsupportedOperationException();
     }
 
@@ -130,8 +130,8 @@ public interface Table {
      * }
      * </code>
      */
-    default ResponseItem getItem(Consumer<ItemKey.Builder> key) {
-        ItemKey.Builder itemBuilder = ItemKey.builder();
+    default ResponseItem getItem(Consumer<RequestItem.Builder> key) {
+        RequestItem.Builder itemBuilder = RequestItem.builder();
         key.accept(itemBuilder);
         return getItem(itemBuilder.build());
     }
