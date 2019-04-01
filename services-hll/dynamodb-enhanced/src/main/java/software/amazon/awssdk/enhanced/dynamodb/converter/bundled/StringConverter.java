@@ -5,6 +5,7 @@ import static java.util.stream.Collectors.toList;
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.List;
+import software.amazon.awssdk.annotations.Immutable;
 import software.amazon.awssdk.annotations.SdkPublicApi;
 import software.amazon.awssdk.annotations.ThreadSafe;
 import software.amazon.awssdk.core.SdkBytes;
@@ -19,6 +20,7 @@ import software.amazon.awssdk.enhanced.dynamodb.model.TypeToken;
  */
 @SdkPublicApi
 @ThreadSafe
+@Immutable
 public class StringConverter extends ExactInstanceOfConverter<String> {
     public StringConverter() {
         super(String.class);

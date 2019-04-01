@@ -1,8 +1,8 @@
 package software.amazon.awssdk.enhanced.dynamodb.converter.bundled;
 
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
+import software.amazon.awssdk.annotations.Immutable;
 import software.amazon.awssdk.annotations.SdkPublicApi;
 import software.amazon.awssdk.annotations.ThreadSafe;
 import software.amazon.awssdk.enhanced.dynamodb.converter.ConversionContext;
@@ -18,6 +18,7 @@ import software.amazon.awssdk.enhanced.dynamodb.model.TypeToken;
  */
 @SdkPublicApi
 @ThreadSafe
+@Immutable
 public class RequestItemConverter extends InstanceOfConverter<RequestItem> {
     public RequestItemConverter() {
         super(RequestItem.class);

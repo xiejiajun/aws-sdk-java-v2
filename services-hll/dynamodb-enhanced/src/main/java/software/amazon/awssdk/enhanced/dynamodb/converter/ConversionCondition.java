@@ -3,6 +3,7 @@ package software.amazon.awssdk.enhanced.dynamodb.converter;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import software.amazon.awssdk.annotations.Immutable;
 import software.amazon.awssdk.annotations.SdkPublicApi;
 import software.amazon.awssdk.annotations.ThreadSafe;
 import software.amazon.awssdk.enhanced.dynamodb.internal.converter.ExactInstanceOfConversionCondition;
@@ -18,6 +19,7 @@ import software.amazon.awssdk.enhanced.dynamodb.internal.converter.InstanceOfCon
  */
 @SdkPublicApi
 @ThreadSafe
+@Immutable
 public interface ConversionCondition {
     /**
      * Create a condition that resolves to true when the Java type being converted exactly matches the provided type.

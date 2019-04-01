@@ -5,6 +5,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
+import software.amazon.awssdk.annotations.Immutable;
 import software.amazon.awssdk.annotations.SdkPublicApi;
 import software.amazon.awssdk.annotations.ThreadSafe;
 import software.amazon.awssdk.enhanced.dynamodb.converter.ConversionContext;
@@ -19,6 +20,7 @@ import software.amazon.awssdk.utils.Validate;
  */
 @SdkPublicApi
 @ThreadSafe
+@Immutable
 public class MapConverter extends InstanceOfConverter<Map<?, ?>> {
     private final Function<Object, String> keyToStringConverter;
 

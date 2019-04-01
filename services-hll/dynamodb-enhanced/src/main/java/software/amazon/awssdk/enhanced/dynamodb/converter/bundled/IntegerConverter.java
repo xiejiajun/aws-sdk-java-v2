@@ -1,5 +1,6 @@
 package software.amazon.awssdk.enhanced.dynamodb.converter.bundled;
 
+import software.amazon.awssdk.annotations.Immutable;
 import software.amazon.awssdk.annotations.SdkPublicApi;
 import software.amazon.awssdk.annotations.ThreadSafe;
 import software.amazon.awssdk.enhanced.dynamodb.converter.ConversionContext;
@@ -13,6 +14,7 @@ import software.amazon.awssdk.enhanced.dynamodb.model.TypeToken;
  */
 @SdkPublicApi
 @ThreadSafe
+@Immutable
 public class IntegerConverter extends ExactInstanceOfConverter<Integer> {
     public IntegerConverter() {
         super(Integer.class);

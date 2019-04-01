@@ -1,6 +1,7 @@
 package software.amazon.awssdk.enhanced.dynamodb.converter;
 
 import java.time.Instant;
+import software.amazon.awssdk.annotations.Immutable;
 import software.amazon.awssdk.annotations.SdkPublicApi;
 import software.amazon.awssdk.annotations.ThreadSafe;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;

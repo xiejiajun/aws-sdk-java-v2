@@ -2,7 +2,10 @@ package software.amazon.awssdk.enhanced.dynamodb.model;
 
 import java.util.Collection;
 import java.util.List;
+import software.amazon.awssdk.annotations.Immutable;
+import software.amazon.awssdk.annotations.NotThreadSafe;
 import software.amazon.awssdk.annotations.SdkPublicApi;
+import software.amazon.awssdk.annotations.ThreadSafe;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
 import software.amazon.awssdk.enhanced.dynamodb.converter.ItemAttributeValueConverter;
 import software.amazon.awssdk.enhanced.dynamodb.converter.DefaultConverterChain;
@@ -14,6 +17,8 @@ import software.amazon.awssdk.enhanced.dynamodb.converter.DefaultConverterChain;
  * and DynamoDB types.
  */
 @SdkPublicApi
+@ThreadSafe
+@Immutable
 public interface ConverterAware {
     /**
      * Retrieve all converters that were directly configured on this object.
@@ -26,6 +31,7 @@ public interface ConverterAware {
      * See {@link ItemAttributeValueConverter} for a detailed explanation of how the enhanced client converts between Java types
      * and DynamoDB types.
      */
+    @NotThreadSafe
     interface Builder {
         /**
          * Add all of the provided converters to this builder, in the order of the provided collection.

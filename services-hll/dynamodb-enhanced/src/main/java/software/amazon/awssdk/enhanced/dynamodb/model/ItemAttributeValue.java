@@ -9,6 +9,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import software.amazon.awssdk.annotations.Immutable;
 import software.amazon.awssdk.annotations.SdkPublicApi;
 import software.amazon.awssdk.annotations.ThreadSafe;
 import software.amazon.awssdk.core.SdkBytes;
@@ -20,6 +21,7 @@ import software.amazon.awssdk.utils.Validate;
 
 @SdkPublicApi
 @ThreadSafe
+@Immutable
 public final class ItemAttributeValue {
     private final ItemAttributeValueType type;
     private final boolean isNull;

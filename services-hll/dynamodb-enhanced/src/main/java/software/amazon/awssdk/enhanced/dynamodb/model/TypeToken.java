@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import software.amazon.awssdk.annotations.Immutable;
 import software.amazon.awssdk.annotations.SdkPublicApi;
 import software.amazon.awssdk.annotations.ThreadSafe;
 import software.amazon.awssdk.enhanced.dynamodb.internal.model.DefaultParameterizedType;
@@ -46,6 +47,7 @@ import software.amazon.awssdk.utils.Validate;
  */
 @SdkPublicApi
 @ThreadSafe
+@Immutable
 public class TypeToken<T> {
     private final Type runtimeType;
     private final Class<T> representedClass;

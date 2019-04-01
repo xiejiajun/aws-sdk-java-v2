@@ -1,6 +1,8 @@
 package software.amazon.awssdk.enhanced.dynamodb.model;
 
 import java.util.Map;
+import software.amazon.awssdk.annotations.Immutable;
+import software.amazon.awssdk.annotations.NotThreadSafe;
 import software.amazon.awssdk.annotations.SdkPublicApi;
 import software.amazon.awssdk.annotations.ThreadSafe;
 
@@ -11,6 +13,7 @@ import software.amazon.awssdk.annotations.ThreadSafe;
  */
 @SdkPublicApi
 @ThreadSafe
+@Immutable
 public interface AttributeAware<AttributeT> {
     /**
      * Retrieve an unmodifiable view of all attributes, indexed by the attribute key.
@@ -27,6 +30,7 @@ public interface AttributeAware<AttributeT> {
      *
      * This allows sharing of attribute population code and documentation between types with attributes.
      */
+    @NotThreadSafe
     interface Builder<AttributeT> {
         /**
          * Add all of the provided attributes, overriding any existing attributes that share the same keys.

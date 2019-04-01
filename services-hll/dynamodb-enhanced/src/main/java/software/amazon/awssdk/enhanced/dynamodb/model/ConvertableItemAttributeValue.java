@@ -3,6 +3,7 @@ package software.amazon.awssdk.enhanced.dynamodb.model;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import software.amazon.awssdk.annotations.Immutable;
 import software.amazon.awssdk.annotations.SdkPublicApi;
 import software.amazon.awssdk.annotations.ThreadSafe;
 import software.amazon.awssdk.enhanced.dynamodb.Table;
@@ -26,6 +27,7 @@ import software.amazon.awssdk.enhanced.dynamodb.converter.ItemAttributeValueConv
  */
 @SdkPublicApi
 @ThreadSafe
+@Immutable
 public interface ConvertableItemAttributeValue {
     /**
      * Retrieve the {@link ItemAttributeValue} exactly as it was returned by DynamoDB.

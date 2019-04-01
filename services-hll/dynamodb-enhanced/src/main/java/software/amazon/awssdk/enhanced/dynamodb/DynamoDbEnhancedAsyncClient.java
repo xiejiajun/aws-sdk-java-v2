@@ -1,6 +1,7 @@
 package software.amazon.awssdk.enhanced.dynamodb;
 
 import java.util.Collection;
+import software.amazon.awssdk.annotations.Immutable;
 import software.amazon.awssdk.annotations.SdkPublicApi;
 import software.amazon.awssdk.annotations.ThreadSafe;
 import software.amazon.awssdk.enhanced.dynamodb.converter.ItemAttributeValueConverter;
@@ -21,6 +22,7 @@ import software.amazon.awssdk.utils.builder.ToCopyableBuilder;
  */
 @SdkPublicApi
 @ThreadSafe
+@Immutable
 public interface DynamoDbEnhancedAsyncClient extends ToCopyableBuilder<DynamoDbEnhancedAsyncClient.Builder, DynamoDbEnhancedAsyncClient>,
                                                      SdkAutoCloseable {
     /**

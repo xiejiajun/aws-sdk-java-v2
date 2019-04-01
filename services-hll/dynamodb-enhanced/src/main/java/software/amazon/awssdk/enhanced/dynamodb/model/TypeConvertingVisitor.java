@@ -4,12 +4,10 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import software.amazon.awssdk.annotations.SdkPublicApi;
-import software.amazon.awssdk.annotations.ThreadSafe;
 import software.amazon.awssdk.core.SdkBytes;
 import software.amazon.awssdk.enhanced.dynamodb.converter.ItemAttributeValueConverter;
 
 @SdkPublicApi
-@ThreadSafe
 public abstract class TypeConvertingVisitor<T> {
     private final Class<? extends ItemAttributeValueConverter> converterClass;
     private final Class<?> targetType;

@@ -1,6 +1,9 @@
 package software.amazon.awssdk.enhanced.dynamodb.converter;
 
-import software.amazon.awssdk.annotations.SdkInternalApi;
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+import software.amazon.awssdk.annotations.Immutable;
 import software.amazon.awssdk.annotations.SdkPublicApi;
 import software.amazon.awssdk.annotations.ThreadSafe;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedAsyncClient;
@@ -15,6 +18,8 @@ import software.amazon.awssdk.enhanced.dynamodb.converter.bundled.ResponseItemCo
 import software.amazon.awssdk.enhanced.dynamodb.converter.bundled.StringConverter;
 import software.amazon.awssdk.enhanced.dynamodb.internal.converter.ItemAttributeValueConverterChain;
 import software.amazon.awssdk.enhanced.dynamodb.model.ItemAttributeValue;
+import software.amazon.awssdk.enhanced.dynamodb.model.RequestItem;
+import software.amazon.awssdk.enhanced.dynamodb.model.ResponseItem;
 import software.amazon.awssdk.enhanced.dynamodb.model.TypeToken;
 
 /**
@@ -22,23 +27,54 @@ import software.amazon.awssdk.enhanced.dynamodb.model.TypeToken;
  *
  * This is the root converter for all created {@link DynamoDbEnhancedClient}s and {@link DynamoDbEnhancedAsyncClient}s.
  *
+ * Supported Number Types:
+ * <ul>
+ *     <li>{@link Instant}</li>
+ *     <li>{@link Integer}</li>
+ * </ul>
+ *
+ * Supported String Types:
+ * <ul>
+ *     <li>{@link String}</li>
+ * </ul>
+ *
+ * Supported List Types:
+ * <ul>
+ *     <li>{@link List} (plus subtypes)</li>
+ * </ul>
+ *
+ * Supported Item Types:
+ * <ul>
+ *     <li>{@link Map} (plus subtypes)</li>
+ *     <li>{@link RequestItem} (plus subtypes)</li>
+ *     <li>{@link ResponseItem} (plus subtypes)</li>
+ *     <li>{@link ItemAttributeValue}</li>
+ * </ul>
+ *
  * This can be created via {@link #create()}.
  */
 @SdkPublicApi
 @ThreadSafe
+@Immutable
 public final class DefaultConverterChain implements ItemAttributeValueConverter {
     private static final ItemAttributeValueConverter CHAIN;
 
     static {
         CHAIN = ItemAttributeValueConverterChain.builder()
+                                                // Exact InstanceOf Converters
+
                                                 .addConverter(new InstantConverter())
                                                 .addConverter(new IntegerConverter())
                                                 .addConverter(new StringConverter())
-                                                .addConverter(new ListConverter())
-                                                .addConverter(new MapConverter())
+                                                .addConverter(new IdentityConverter())
+
+                                                // InstanceOf Converters
+                                                // Potential optimization: allow InstanceOf converters to specify a set of
+                                                // types that should be cached in an eager fashion (eg. DefaultRequestItem)
                                                 .addConverter(new RequestItemConverter())
                                                 .addConverter(new ResponseItemConverter())
-                                                .addConverter(new IdentityConverter())
+                                                .addConverter(new ListConverter())
+                                                .addConverter(new MapConverter())
                                                 .build();
     }
 

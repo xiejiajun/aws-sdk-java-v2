@@ -1,6 +1,7 @@
 package software.amazon.awssdk.enhanced.dynamodb.model;
 
 import java.util.Map;
+import software.amazon.awssdk.annotations.Immutable;
 import software.amazon.awssdk.annotations.SdkPublicApi;
 import software.amazon.awssdk.annotations.ThreadSafe;
 import software.amazon.awssdk.enhanced.dynamodb.internal.model.DefaultResponseItem;
@@ -9,6 +10,7 @@ import software.amazon.awssdk.utils.builder.ToCopyableBuilder;
 
 @SdkPublicApi
 @ThreadSafe
+@Immutable
 public interface ResponseItem extends AttributeAware<ConvertableItemAttributeValue>,
                                       ToCopyableBuilder<ResponseItem.Builder, ResponseItem> {
     static Builder builder() {

@@ -1,9 +1,9 @@
 package software.amazon.awssdk.enhanced.dynamodb;
 
 import java.util.function.Consumer;
+import software.amazon.awssdk.annotations.Immutable;
 import software.amazon.awssdk.annotations.SdkPublicApi;
 import software.amazon.awssdk.annotations.ThreadSafe;
-import software.amazon.awssdk.enhanced.dynamodb.model.RequestItem;
 import software.amazon.awssdk.enhanced.dynamodb.model.RequestItem;
 import software.amazon.awssdk.enhanced.dynamodb.model.ResponseItem;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
@@ -26,6 +26,7 @@ import software.amazon.awssdk.services.dynamodb.model.PutItemRequest;
  */
 @SdkPublicApi
 @ThreadSafe
+@Immutable
 public interface Table {
     /**
      * Retrieve the name of the DynamoDB table. This does not make a service call, and does not guarantee that the DynamoDB table

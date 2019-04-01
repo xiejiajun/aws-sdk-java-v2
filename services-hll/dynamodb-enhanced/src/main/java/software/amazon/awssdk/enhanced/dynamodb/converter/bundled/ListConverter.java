@@ -6,6 +6,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import software.amazon.awssdk.annotations.Immutable;
 import software.amazon.awssdk.annotations.SdkPublicApi;
 import software.amazon.awssdk.annotations.ThreadSafe;
 import software.amazon.awssdk.core.SdkBytes;
@@ -21,6 +22,7 @@ import software.amazon.awssdk.utils.Validate;
  */
 @SdkPublicApi
 @ThreadSafe
+@Immutable
 public class ListConverter extends InstanceOfConverter<List<?>> {
     public ListConverter() {
         super(List.class);
