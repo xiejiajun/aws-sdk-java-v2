@@ -1,10 +1,17 @@
 package software.amazon.awssdk.enhanced.dynamodb.internal.converter;
 
 import java.util.Optional;
+import software.amazon.awssdk.annotations.SdkInternalApi;
+import software.amazon.awssdk.annotations.ThreadSafe;
 import software.amazon.awssdk.enhanced.dynamodb.converter.ConversionContext;
 import software.amazon.awssdk.enhanced.dynamodb.converter.ItemAttributeValueConverter;
 import software.amazon.awssdk.utils.Validate;
 
+/**
+ * The default implementation of {@link ConversionContext}.
+ */
+@SdkInternalApi
+@ThreadSafe
 public class DefaultConversionContext implements ConversionContext {
     private final String attributeName;
     private final ItemAttributeValueConverter converter;

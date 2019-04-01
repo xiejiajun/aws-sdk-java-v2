@@ -16,7 +16,7 @@ import software.amazon.awssdk.utils.builder.ToCopyableBuilder;
 /**
  * A synchronous client for interacting with DynamoDB.
  *
- * The enhanced DynamoDB client replaces the generated {@link DynamoDbClient} with one that is easier for a Java customer to
+ * This enhanced DynamoDB client replaces the generated {@link DynamoDbClient} with one that is easier for a Java customer to
  * use. It does this by converting between Java built-in types (eg. java.time.Instant) and DynamoDB attribute value types.
  *
  * This can be created using the static {@link #builder()} or {@link #create()} methods. The client must be {@link #close()}d
@@ -90,8 +90,8 @@ public interface DynamoDbEnhancedClient extends ToCopyableBuilder<DynamoDbEnhanc
     }
 
     /**
-     * Create a {@link Table} that can be used for interacting with DynamoDB. This does not make any remote calls, and as a result
-     * does not validate that the requested table actually exists.
+     * Retrieve a {@link Table} that can be used for interacting with DynamoDB. This does not make any remote calls, and as a
+     * result does not validate that the requested table actually exists.
      *
      * If the table does not exist, exceptions will be thrown when trying to load or retrieve data from the returned
      * {@link Table} object. The returned {@link Table} will stop working if the enhanced client is {@link #close()}d.
@@ -160,6 +160,7 @@ public interface DynamoDbEnhancedClient extends ToCopyableBuilder<DynamoDbEnhanc
          * Build a {@link DynamoDbEnhancedClient} from the provided configuration. This method can be invoked multiple times to
          * create multiple {@link DynamoDbEnhancedClient} instances.
          */
+        @Override
         DynamoDbEnhancedClient build();
     }
 }

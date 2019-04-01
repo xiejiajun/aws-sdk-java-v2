@@ -13,6 +13,10 @@ import software.amazon.awssdk.enhanced.dynamodb.internal.converter.ItemAttribute
 import software.amazon.awssdk.enhanced.dynamodb.model.AttributeAware;
 import software.amazon.awssdk.enhanced.dynamodb.model.ConverterAware;
 
+/**
+ * A base class from which {@link DefaultGeneratedRequestItem}, {@link DefaultGeneratedResponseItem},
+ * {@link DefaultRequestItem} and {@link DefaultResponseItem} derive their implementations.
+ */
 @SdkInternalApi
 @ThreadSafe
 public abstract class DefaultItem<AttributeT> implements ConverterAware,

@@ -11,6 +11,9 @@ import software.amazon.awssdk.enhanced.dynamodb.internal.converter.ItemAttribute
 import software.amazon.awssdk.enhanced.dynamodb.internal.model.DefaultAsyncTable;
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient;
 
+/**
+ * The default implementation of {@link DynamoDbEnhancedAsyncClient}.
+ */
 @SdkInternalApi
 @ThreadSafe
 public class DefaultDynamoDbEnhancedAsyncClient implements DynamoDbEnhancedAsyncClient {

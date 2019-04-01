@@ -5,6 +5,9 @@ import software.amazon.awssdk.annotations.ThreadSafe;
 import software.amazon.awssdk.enhanced.dynamodb.model.GeneratedRequestItem;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
+/**
+ * The default implementation of {@link GeneratedRequestItem}.
+ */
 @SdkInternalApi
 @ThreadSafe
 public class DefaultGeneratedRequestItem extends DefaultItem<AttributeValue> implements GeneratedRequestItem {

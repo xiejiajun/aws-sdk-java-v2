@@ -5,6 +5,9 @@ import java.lang.reflect.Type;
 import software.amazon.awssdk.annotations.SdkInternalApi;
 import software.amazon.awssdk.annotations.ThreadSafe;
 
+/**
+ * An implementation of {@link ParameterizedType} that guarantees its raw type is always a {@link Class}.
+ */
 @SdkInternalApi
 @ThreadSafe
 public final class DefaultParameterizedType implements ParameterizedType {

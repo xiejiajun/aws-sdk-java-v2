@@ -9,6 +9,11 @@ import software.amazon.awssdk.enhanced.dynamodb.model.ItemAttributeValue;
 import software.amazon.awssdk.enhanced.dynamodb.model.TypeToken;
 import software.amazon.awssdk.utils.Validate;
 
+/**
+ * A base class that simplifies the process of implementing an {@link ItemAttributeValueConverter} with the
+ * {@link ConversionCondition#isInstanceOf(Class)} conversion type. This handles casting to/from the mapped type and
+ * validates that the converter is being invoked with the correct types.
+ */
 @SdkInternalApi
 @ThreadSafe
 public abstract class InstanceOfConverter<T> implements ItemAttributeValueConverter {

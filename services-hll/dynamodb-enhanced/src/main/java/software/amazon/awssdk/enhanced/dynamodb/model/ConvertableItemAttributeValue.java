@@ -48,7 +48,7 @@ public interface ConvertableItemAttributeValue {
      * {@link #asList(Class)}. Maps should use {@link #asMap(Class, Class)}.
      *
      * When creating a {@link TypeToken}, you must create an anonymous sub-class, eg.
-     * {@code new TypeToken<Collection<String>>(){\}} (note the extra {}).
+     * {@code new TypeToken<Collection<String>>()&#123;&#125;} (note the extra {}).
      */
     <T> T as(TypeToken<T> type);
 

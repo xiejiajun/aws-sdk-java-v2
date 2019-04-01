@@ -15,18 +15,35 @@ import software.amazon.awssdk.enhanced.dynamodb.model.ItemAttributeValue;
 import software.amazon.awssdk.enhanced.dynamodb.model.TypeToken;
 import software.amazon.awssdk.utils.Logger;
 
+/**
+ * A chain of converters, invoking the underlying converters based on the precedence defined in the
+ * {@link ItemAttributeValueConverter} documentation.
+ *
+ * Given an input, this will identify a converter that can convert the specific Java type and invoke it. If a converter cannot
+ * be found, it will invoke a "parent" converter, which would be expected to be able to convert the value (or throw an exception).
+ */
 @SdkInternalApi
 @ThreadSafe
 public final class ItemAttributeValueConverterChain implements ItemAttributeValueConverter {
     private static final Logger log = Logger.loggerFor(ItemAttributeValueConverterChain.class);
 
-    private final List<ItemAttributeValueConverter> converters;
+    /**
+     * All converters in this chain that match the {@link ConversionCondition#isInstanceOf(Class)}
+     */
     private final List<ItemAttributeValueConverter> instanceOfConverters = new ArrayList<>();
+
+    /**
+     * A cache from Java type to the converter for that type. This is pre-populated with all
+     * {@link ConversionCondition#isExactInstanceOf(Class)} converters in this chain.
+     */
     private final ConcurrentHashMap<Class<?>, ItemAttributeValueConverter> converterCache = new ConcurrentHashMap<>();
+
+    /**
+     * The "default converter" to invoke if no converters can be found in this chain supporting a specific type.
+     */
     private final ItemAttributeValueConverter parent;
 
     private ItemAttributeValueConverterChain(Builder builder) {
-        this.converters = builder.converters;
         for (ItemAttributeValueConverter converter : builder.converters) {
             ConversionCondition condition = converter.defaultConversionCondition();
 
@@ -35,6 +52,7 @@ public final class ItemAttributeValueConverterChain implements ItemAttributeValu
             }
 
             if (condition instanceof ExactInstanceOfConversionCondition) {
+                // Pre-cache all exact-condition converters
                 ExactInstanceOfConversionCondition exactCondition = (ExactInstanceOfConversionCondition) condition;
                 this.converterCache.putIfAbsent(exactCondition.convertedClass(), converter);
             }
@@ -43,10 +61,16 @@ public final class ItemAttributeValueConverterChain implements ItemAttributeValu
         this.parent = builder.parent;
     }
 
-    public static ItemAttributeValueConverterChain.Builder builder() {
-        return new ItemAttributeValueConverterChain.Builder();
+    /**
+     * Create a builder that can be used to configure and create a {@link ItemAttributeValueConverterChain}.
+     */
+    public static Builder builder() {
+        return new Builder();
     }
 
+    /**
+     * A simplified way of invoking {@code builder().addAll(converters).build()}.
+     */
     public static ItemAttributeValueConverterChain create(Collection<? extends ItemAttributeValueConverter> converters) {
         return builder().addConverters(converters).build();
     }
@@ -66,16 +90,22 @@ public final class ItemAttributeValueConverterChain implements ItemAttributeValu
         return invokeConverter(desiredType.representedClass(), c -> c.fromAttributeValue(input, desiredType, context));
     }
 
+    /**
+     * Find a converter that matches the provided type. Once the converter is found, invoke the provided invoker to generate
+     * a result type.
+     */
     private <T> T invokeConverter(Class<?> type, Function<ItemAttributeValueConverter, T> converterInvoker) {
         log.debug(() -> "Loading converter for " + type.getTypeName() + ".");
 
         ItemAttributeValueConverter converter = converterCache.get(type);
-
         if (converter != null) {
             return converterInvoker.apply(converter);
         }
 
-        converter = findConverter(type);
+        log.debug(() -> "Converter not cached for " + type.getTypeName() + ". " +
+                        "Checking for an instanceof converter match.");
+
+        converter = findInstanceOfConverter(type);
 
         if (converter == null && parent != null) {
             log.debug(() -> "Converter not found in this chain for " + type.getTypeName() + ". Parent will be used.");
@@ -98,13 +128,11 @@ public final class ItemAttributeValueConverterChain implements ItemAttributeValu
     }
 
     private boolean shouldCache(Class<?> type) {
+        // Do not cache anonymous classes, to prevent memory leaks.
         return !type.isAnonymousClass();
     }
 
-    private ItemAttributeValueConverter findConverter(Class<?> type) {
-        log.debug(() -> "Converter not cached for " + type.getTypeName() + ". " +
-                        "Checking for an instanceof converter match.");
-
+    private ItemAttributeValueConverter findInstanceOfConverter(Class<?> type) {
         for (ItemAttributeValueConverter converter : instanceOfConverters) {
             InstanceOfConversionCondition condition = (InstanceOfConversionCondition)
                     converter.defaultConversionCondition();

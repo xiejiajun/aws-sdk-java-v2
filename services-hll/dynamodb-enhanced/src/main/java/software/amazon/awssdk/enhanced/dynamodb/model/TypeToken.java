@@ -36,12 +36,39 @@ import java.util.stream.Collectors;
 import software.amazon.awssdk.annotations.Immutable;
 import software.amazon.awssdk.annotations.SdkPublicApi;
 import software.amazon.awssdk.annotations.ThreadSafe;
+import software.amazon.awssdk.enhanced.dynamodb.converter.ItemAttributeValueConverter;
 import software.amazon.awssdk.enhanced.dynamodb.internal.model.DefaultParameterizedType;
 import software.amazon.awssdk.utils.ToString;
 import software.amazon.awssdk.utils.Validate;
 
 /**
  * A {@link Type} with generics.
+ *
+ * This is useful for being able to not only reflect on a specific class, but also any type parameters within that class.
+ *
+ * For example, this allows retrieving a {@code List.class} and {@code String.class} from a {@code TypeToken<List<String>>}.
+ * This type-parameter information can then be used for more specific type conversion within a
+ * {@link ItemAttributeValueConverter}.
+ *
+ * There are a few ways to create a {@link TypeToken}, depending on the type being represented:
+ * <ul>
+ *     <li>For non-parameterized types, use {@link TypeToken#from(Class)}, eg. {@code TypeToken.from(String.class)} for a
+ *     {@code TypeToken<String>}.</li>
+ *     <li>For parameterized lists, use {@link TypeToken#listOf(Class)}, eg. {@code TypeToken.listOf(String.class)} for a
+ *     {@code TypeToken<List<String>>}.</li>
+ *     <li>For parameterized maps, use {@link TypeToken#mapOf(Class, Class)},
+ *     eg. {@code TypeToken.MapOf(String.class, Integer.class)} for a {@code TypeToken<Map<String, Integer>>}.</li>
+ *     <li>For other parameterized types, you must create an anonymous subclass of this token, so that the type token can
+ *     capture the type parameters using reflection. eg. {@code new TypeToken<Iterable<String>>()&#123;&#125;} (note the extra
+ *     {}) for a {@code TypeToken<Iterable<String>>}.</li>
+ * </ul>
+ *
+ * This source was modified heavily from the Guava implementation of the same name:
+ * https://github.com/google/guava/blob/master/guava/src/com/google/common/reflect/TypeToken.java
+ *
+ * Original source is Copyright (C) 2006 The Guava Authors
+ * Licensed under the Apache License, Version 2.0 (the "License"):
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Original Guava authors: Bob Lee, Sven Mawson, Ben Yu
  */
@@ -53,6 +80,12 @@ public class TypeToken<T> {
     private final Class<T> representedClass;
     private final List<TypeToken<?>> representedClassParameters;
 
+    /**
+     * Create a type token, capturing the generic type arguments of the token as {@link Class}es.
+     *
+     * <b>This must be called from an anonymous subclass.</b> For example, </b>
+     * {@code new TypeToken<Iterable<String>>()&#123;&#125;} (note the extra {}) for a {@code TypeToken<Iterable<String>>}.
+     */
     protected TypeToken() {
         this(null);
     }
@@ -67,18 +100,27 @@ public class TypeToken<T> {
         this.representedClassParameters = loadRepresentedClassParameters();
     }
 
-    public static TypeToken<?> from(Type type) {
+    private static TypeToken<?> from(Type type) {
         return new TypeToken<>(Validate.paramNotNull(type, "type"));
     }
 
+    /**
+     * Create a type token for the provided non-parameterized class.
+     */
     public static <T> TypeToken<T> from(Class<T> type) {
         return new TypeToken<>(Validate.paramNotNull(type, "type"));
     }
 
+    /**
+     * Create a type token for a list, with the provided value type class.
+     */
     public static <T> TypeToken<List<T>> listOf(Class<T> valueType) {
         return new TypeToken<>(DefaultParameterizedType.parameterizedType(List.class, valueType));
     }
 
+    /**
+     * Create a type token for a map, with the provided key and value type classes.
+     */
     public static <T, U> TypeToken<Map<T, U>> mapOf(Class<T> keyType, Class<U> valueType) {
         return new TypeToken<>(DefaultParameterizedType.parameterizedType(Map.class, keyType, valueType));
     }
@@ -89,6 +131,27 @@ public class TypeToken<T> {
         Validate.validState(!(type instanceof TypeVariable), "Type variable type %s is not supported.", type);
         Validate.validState(!(type instanceof WildcardType), "Wildcard type %s is not supported.", type);
         return type;
+    }
+
+    /**
+     * Retrieve the {@link Class} object that this type token represents.
+     *
+     * Eg. For {@code TypeToken<String>}, this would return {@code String.class}.
+     */
+    public Class<T> representedClass() {
+        return representedClass;
+    }
+
+    /**
+     * Retrieve the {@link Class} objects of any type parameters for the class that this type token represents.
+     *
+     * Eg. For {@code TypeToken<List<String>>}, this would return {@code String.class}, and {@link #representedClass()} would
+     * return {@code List.class}.
+     *
+     * If there are no type parameters, this will return an empty list.
+     */
+    public List<TypeToken<?>> representedClassParameters() {
+        return representedClassParameters;
     }
 
     private Type captureGenericTypeArguments() {
@@ -122,14 +185,6 @@ public class TypeToken<T> {
                 Arrays.stream(type.getActualTypeArguments())
                      .map(TypeToken::from)
                      .collect(Collectors.toList()));
-    }
-
-    public Class<T> representedClass() {
-        return representedClass;
-    }
-
-    public List<TypeToken<?>> representedClassParameters() {
-        return representedClassParameters;
     }
 
     @Override

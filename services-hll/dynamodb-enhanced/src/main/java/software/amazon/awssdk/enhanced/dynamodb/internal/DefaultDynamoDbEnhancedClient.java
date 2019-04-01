@@ -4,13 +4,16 @@ import java.util.Collection;
 import software.amazon.awssdk.annotations.SdkInternalApi;
 import software.amazon.awssdk.annotations.ThreadSafe;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
+import software.amazon.awssdk.enhanced.dynamodb.Table;
 import software.amazon.awssdk.enhanced.dynamodb.converter.DefaultConverterChain;
 import software.amazon.awssdk.enhanced.dynamodb.converter.ItemAttributeValueConverter;
 import software.amazon.awssdk.enhanced.dynamodb.internal.converter.ItemAttributeValueConverterChain;
 import software.amazon.awssdk.enhanced.dynamodb.internal.model.DefaultTable;
-import software.amazon.awssdk.enhanced.dynamodb.Table;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 
+/**
+ * The default implementation of {@link DynamoDbEnhancedClient}.
+ */
 @SdkInternalApi
 @ThreadSafe
 public class DefaultDynamoDbEnhancedClient implements DynamoDbEnhancedClient {

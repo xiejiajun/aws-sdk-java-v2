@@ -10,6 +10,9 @@ import software.amazon.awssdk.enhanced.dynamodb.model.ItemAttributeValue;
 import software.amazon.awssdk.enhanced.dynamodb.model.ResponseItem;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
+/**
+ * The default implementation of {@link GeneratedResponseItem}.
+ */
 @SdkInternalApi
 @ThreadSafe
 public class DefaultGeneratedResponseItem extends DefaultItem<AttributeValue> implements GeneratedResponseItem {

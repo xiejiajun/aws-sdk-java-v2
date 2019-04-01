@@ -3,12 +3,16 @@ package software.amazon.awssdk.enhanced.dynamodb.internal.model;
 import java.util.function.Consumer;
 import software.amazon.awssdk.annotations.SdkInternalApi;
 import software.amazon.awssdk.annotations.ThreadSafe;
+import software.amazon.awssdk.enhanced.dynamodb.AsyncTable;
 import software.amazon.awssdk.enhanced.dynamodb.converter.ConversionContext;
 import software.amazon.awssdk.enhanced.dynamodb.model.ConvertableItemAttributeValue;
 import software.amazon.awssdk.enhanced.dynamodb.model.ItemAttributeValue;
 import software.amazon.awssdk.enhanced.dynamodb.model.TypeToken;
 import software.amazon.awssdk.utils.Validate;
 
+/**
+ * The default implementation of {@link ConvertableItemAttributeValue}.
+ */
 @SdkInternalApi
 @ThreadSafe
 public final class DefaultConvertableItemAttributeValue implements ConvertableItemAttributeValue {

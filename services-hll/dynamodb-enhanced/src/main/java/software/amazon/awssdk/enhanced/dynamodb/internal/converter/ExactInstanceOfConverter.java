@@ -4,11 +4,17 @@ import software.amazon.awssdk.annotations.SdkInternalApi;
 import software.amazon.awssdk.annotations.ThreadSafe;
 import software.amazon.awssdk.enhanced.dynamodb.converter.ConversionCondition;
 import software.amazon.awssdk.enhanced.dynamodb.converter.ConversionContext;
+import software.amazon.awssdk.enhanced.dynamodb.converter.DefaultConverterChain;
 import software.amazon.awssdk.enhanced.dynamodb.converter.ItemAttributeValueConverter;
 import software.amazon.awssdk.enhanced.dynamodb.model.ItemAttributeValue;
 import software.amazon.awssdk.enhanced.dynamodb.model.TypeToken;
 import software.amazon.awssdk.utils.Validate;
 
+/**
+ * A base class that simplifies the process of implementing an {@link ItemAttributeValueConverter} with the
+ * {@link ConversionCondition#isExactInstanceOf(Class)} conversion type. This handles casting to/from the mapped type and
+ * validates that the converter is being invoked with the correct types.
+ */
 @SdkInternalApi
 @ThreadSafe
 public abstract class ExactInstanceOfConverter<T> implements ItemAttributeValueConverter {

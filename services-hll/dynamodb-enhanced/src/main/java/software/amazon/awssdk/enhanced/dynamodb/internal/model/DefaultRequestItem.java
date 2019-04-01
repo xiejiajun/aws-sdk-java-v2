@@ -7,6 +7,9 @@ import software.amazon.awssdk.enhanced.dynamodb.model.GeneratedRequestItem;
 import software.amazon.awssdk.enhanced.dynamodb.model.ItemAttributeValue;
 import software.amazon.awssdk.enhanced.dynamodb.model.RequestItem;
 
+/**
+ * The default implementation of {@link RequestItem}.
+ */
 @SdkInternalApi
 @ThreadSafe
 public class DefaultRequestItem extends DefaultItem<Object> implements RequestItem {
