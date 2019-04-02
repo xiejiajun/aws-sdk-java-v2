@@ -2,9 +2,6 @@ package software.amazon.awssdk.enhanced.dyamodb;
 
 import java.time.Instant;
 import java.util.Collections;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.Map;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import software.amazon.awssdk.enhanced.dynamodb.AsyncTable;
@@ -13,7 +10,6 @@ import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
 import software.amazon.awssdk.enhanced.dynamodb.Table;
 import software.amazon.awssdk.enhanced.dynamodb.model.ResponseItem;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
-import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.KeyType;
 import software.amazon.awssdk.services.dynamodb.model.ResourceInUseException;
 import software.amazon.awssdk.services.dynamodb.model.ScalarAttributeType;
@@ -43,8 +39,6 @@ public class EnhancedClientIntegrationTest {
               .orFail();
     }
 
-
-
     @Test
     public void getCanReadTheResultOfPut() throws InterruptedException {
         try (DynamoDbEnhancedClient client = DynamoDbEnhancedClient.create()) {
@@ -60,7 +54,6 @@ public class EnhancedClientIntegrationTest {
 
             Thread.sleep(5_000);
 
-
             System.out.println("Getting item...");
 
             ResponseItem book = books.getItem(key -> key.putAttribute("isbn", "0-330-25864-8"));
@@ -71,8 +64,6 @@ public class EnhancedClientIntegrationTest {
                                "Authors: " + book.attribute("authors").asList(String.class));
         }
     }
-
-
 
     @Test
     public void getCanReadTheResultOfPutAsync() throws InterruptedException {
@@ -99,44 +90,6 @@ public class EnhancedClientIntegrationTest {
                                "Title: " + book.attribute("title").asString() + "\n" +
                                "Publication Dates: " + book.attribute("publicationDate").asMap(String.class, Instant.class) + "\n" +
                                "Authors: " + book.attribute("authors").asList(String.class));
-        }
-    }
-
-
-
-    @Test
-    public void getCanReadTheResultOfPutLowLevel() throws InterruptedException {
-        try (DynamoDbClient client = DynamoDbClient.create()) {
-            System.out.println("Putting item...");
-
-            Map<String, AttributeValue> publicationDate = new LinkedHashMap<>();
-            publicationDate.put("UK", AttributeValue.builder().n(Long.toString(Instant.parse("1979-10-12T00:00:00Z").toEpochMilli())).build());
-            publicationDate.put("US", AttributeValue.builder().n(Long.toString(Instant.parse("1980-01-01T00:00:00Z").toEpochMilli())).build());
-
-            Map<String, AttributeValue> requestItem = new LinkedHashMap<>();
-            requestItem.put("isbn", AttributeValue.builder().s("0-330-25864-8").build());
-            requestItem.put("title", AttributeValue.builder().s("The Hitchhiker's Guide to the Galaxy").build());
-            requestItem.put("publicationDate", AttributeValue.builder().m(publicationDate).build());
-            requestItem.put("authors", AttributeValue.builder().ss("Douglas Adams").build());
-
-            client.putItem(r -> r.tableName(TABLE).item(requestItem));
-
-            Thread.sleep(5_000);
-
-            System.out.println("Getting item...");
-
-            Map<String, AttributeValue> key = new HashMap<>();
-            key.put("isbn", AttributeValue.builder().s("0-330-25864-8").build());
-
-            Map<String, AttributeValue> book = client.getItem(r -> r.tableName(TABLE).key(key)).item();
-
-            Map<String, Instant> publicationDates = new LinkedHashMap<>();
-            book.get("publicationDate").m().forEach((k, v) -> publicationDates.put(k, Instant.ofEpochMilli(Long.parseLong(v.n()))));
-
-            System.out.println("ISBN: " + book.get("isbn").s() + "\n" +
-                               "Title: " + book.get("title").s() + "\n" +
-                               "Publication Dates: " + publicationDates + "\n" +
-                               "Authors: " + book.get("authors").ss());
         }
     }
 }
