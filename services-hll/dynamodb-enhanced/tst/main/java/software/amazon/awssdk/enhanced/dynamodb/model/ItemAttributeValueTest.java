@@ -3,12 +3,14 @@ package software.amazon.awssdk.enhanced.dynamodb.model;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import org.junit.Test;
 import software.amazon.awssdk.core.SdkBytes;
 
 public class ItemAttributeValueTest {
     @Test
-    public void fromMethodsCreateCorrectTypes() {
+    public void simpleFromMethodsCreateCorrectTypes() {
         assertThat(ItemAttributeValue.nullValue()).satisfies(v -> {
             assertThat(v.isNull()).isTrue();
             assertThat(v.type()).isEqualTo(ItemAttributeValueType.NULL);
@@ -51,12 +53,29 @@ public class ItemAttributeValueTest {
         });
 
         assertThat(ItemAttributeValue.fromSetOfBytes(Arrays.asList(SdkBytes.fromUtf8String("foo"),
-                                                                   SdkBytes.fromUtf8String("foo2"))))
-                .satisfies(v -> {
+                                                                   SdkBytes.fromUtf8String("foo2")))).satisfies(v -> {
             assertThat(v.isSetOfBytes()).isTrue();
             assertThat(v.asSetOfBytes().get(0).asUtf8String()).isEqualTo("foo");
             assertThat(v.asSetOfBytes().get(1).asUtf8String()).isEqualTo("foo2");
             assertThat(v.type()).isEqualTo(ItemAttributeValueType.SET_OF_BYTES);
+        });
+
+        assertThat(ItemAttributeValue.fromListOfAttributeValues(Arrays.asList(ItemAttributeValue.fromString("foo"),
+                                                                              ItemAttributeValue.fromBoolean(true)))).satisfies(v -> {
+            assertThat(v.isListOfAttributeValues()).isTrue();
+            assertThat(v.asListOfAttributeValues().get(0).asString()).isEqualTo("foo");
+            assertThat(v.asListOfAttributeValues().get(1).asBoolean()).isEqualTo(true);
+            assertThat(v.type()).isEqualTo(ItemAttributeValueType.LIST_OF_ATTRIBUTE_VALUES);
+        });
+
+        Map<String, ItemAttributeValue> map = new LinkedHashMap<>();
+        map.put("a", ItemAttributeValue.fromString("foo"));
+        map.put("b", ItemAttributeValue.fromBoolean(true));
+        assertThat(ItemAttributeValue.fromMap(map)).satisfies(v -> {
+            assertThat(v.isMap()).isTrue();
+            assertThat(v.asMap().get("a").asString()).isEqualTo("foo");
+            assertThat(v.asMap().get("b").asBoolean()).isEqualTo(true);
+            assertThat(v.type()).isEqualTo(ItemAttributeValueType.MAP);
         });
     }
 }

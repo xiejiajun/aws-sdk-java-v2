@@ -290,7 +290,7 @@ public final class ItemAttributeValue {
      * Returns true if the underlying DynamoDB type of this value is a Set of Bytes (bs).
      */
     public boolean isSetOfBytes() {
-        return bytesValue != null;
+        return setOfBytesValue != null;
     }
 
     /**
