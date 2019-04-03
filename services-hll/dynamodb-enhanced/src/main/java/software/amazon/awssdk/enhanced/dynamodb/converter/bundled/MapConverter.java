@@ -36,15 +36,15 @@ public class MapConverter extends InstanceOfConverter<Map<?, ?>> {
     @Override
     protected ItemAttributeValue doToAttributeValue(Map<?, ?> input, ConversionContext context) {
         Map<String, ItemAttributeValue> result = new LinkedHashMap<>();
-        input.forEach((key, value) -> result.put(keyToStringConverter.apply(input),
+        input.forEach((key, value) -> result.put(keyToStringConverter.apply(key),
                                                  context.converter().toAttributeValue(value, context)));
         return ItemAttributeValue.fromMap(result);
     }
 
     @Override
     protected Map<?, ?> doFromAttributeValue(ItemAttributeValue input, TypeToken<?> desiredType, ConversionContext context) {
-        Class<?> mapType = desiredType.representedClass();
-        List<TypeToken<?>> mapTypeParameters = desiredType.representedClassParameters();
+        Class<?> mapType = desiredType.rawClass();
+        List<TypeToken<?>> mapTypeParameters = desiredType.rawClassParameters();
 
         Validate.isTrue(mapTypeParameters.size() == 2,
                         "The desired Map type appears to be parameterized with more than 2 types: %s", desiredType);

@@ -39,7 +39,7 @@ public abstract class InstanceOfConverter<T> implements ItemAttributeValueConver
 
     @Override
     public final Object fromAttributeValue(ItemAttributeValue input, TypeToken<?> desiredType, ConversionContext context) {
-        Validate.isAssignableFrom(type, desiredType.representedClass(),
+        Validate.isAssignableFrom(type, desiredType.rawClass(),
                                   "Requested type %s is not a subtype of %s.",
                                   desiredType, type);
 

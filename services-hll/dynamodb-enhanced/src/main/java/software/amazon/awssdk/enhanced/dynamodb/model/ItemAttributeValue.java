@@ -3,6 +3,7 @@ package software.amazon.awssdk.enhanced.dynamodb.model;
 import static java.util.stream.Collectors.toList;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -212,7 +213,7 @@ public final class ItemAttributeValue {
         if (attributeValue.bs() != null && !(attributeValue.bs() instanceof SdkAutoConstructList)) {
             return ItemAttributeValue.fromSetOfBytes(attributeValue.bs());
         }
-        if (attributeValue.ss() != null && !(attributeValue.bs() instanceof SdkAutoConstructList)) {
+        if (attributeValue.ss() != null && !(attributeValue.ss() instanceof SdkAutoConstructList)) {
             return ItemAttributeValue.fromSetOfStrings(attributeValue.ss());
         }
         if (attributeValue.ns() != null && !(attributeValue.ns() instanceof SdkAutoConstructList)) {
@@ -444,18 +445,10 @@ public final class ItemAttributeValue {
 
     @Override
     public String toString() {
+        Object value = convert(ToStringVisitor.INSTANCE);
         return ToString.builder("ItemAttributeValue")
                        .add("type", type)
-                       .add("null", isNull)
-                       .add("map", mapValue)
-                       .add("string", stringValue)
-                       .add("number", numberValue)
-                       .add("bytes", bytesValue)
-                       .add("boolean", booleanValue)
-                       .add("setOfStrings", setOfStringsValue)
-                       .add("setOfNumbers", setOfNumbersValue)
-                       .add("setOfBytes", setOfBytesValue)
-                       .add("listOfAttributeValues", listOfAttributeValuesValue)
+                       .add("value", value)
                        .build();
     }
 
@@ -518,6 +511,64 @@ public final class ItemAttributeValue {
             return AttributeValue.builder()
                                  .l(value.stream().map(ItemAttributeValue::toGeneratedAttributeValue).collect(toList()))
                                  .build();
+        }
+    }
+
+    private static class ToStringVisitor extends TypeConvertingVisitor<Object> {
+        private static final ToStringVisitor INSTANCE = new ToStringVisitor();
+
+        private ToStringVisitor() {
+            super(Object.class);
+        }
+
+        @Override
+        public Object convertNull() {
+            return "null";
+        }
+
+        @Override
+        public Object convertMap(Map<String, ItemAttributeValue> value) {
+            return value;
+        }
+
+        @Override
+        public Object convertString(String value) {
+            return value;
+        }
+
+        @Override
+        public Object convertNumber(String value) {
+            return value;
+        }
+
+        @Override
+        public Object convertBytes(SdkBytes value) {
+            return value;
+        }
+
+        @Override
+        public Object convertBoolean(Boolean value) {
+            return value;
+        }
+
+        @Override
+        public Object convertSetOfStrings(List<String> value) {
+            return value;
+        }
+
+        @Override
+        public Object convertSetOfNumbers(List<String> value) {
+            return value;
+        }
+
+        @Override
+        public Object convertSetOfBytes(List<SdkBytes> value) {
+            return value;
+        }
+
+        @Override
+        public Object convertListOfAttributeValues(Collection<ItemAttributeValue> value) {
+            return value;
         }
     }
 

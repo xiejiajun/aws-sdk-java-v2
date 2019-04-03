@@ -39,8 +39,8 @@ public class ListConverter extends InstanceOfConverter<List<?>> {
 
     @Override
     protected List<?> doFromAttributeValue(ItemAttributeValue input, TypeToken<?> desiredType, ConversionContext context) {
-        Class<?> listType = desiredType.representedClass();
-        List<TypeToken<?>> listTypeParameters = desiredType.representedClassParameters();
+        Class<?> listType = desiredType.rawClass();
+        List<TypeToken<?>> listTypeParameters = desiredType.rawClassParameters();
 
         Validate.isTrue(listTypeParameters.size() == 1,
                         "The desired List type appears to be parameterized with more than 1 type: %s", desiredType);

@@ -4,11 +4,14 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import software.amazon.awssdk.annotations.SdkInternalApi;
 import software.amazon.awssdk.annotations.ThreadSafe;
+import software.amazon.awssdk.enhanced.dynamodb.converter.ConversionContext;
 import software.amazon.awssdk.enhanced.dynamodb.model.ConvertableItemAttributeValue;
 import software.amazon.awssdk.enhanced.dynamodb.model.GeneratedResponseItem;
 import software.amazon.awssdk.enhanced.dynamodb.model.ItemAttributeValue;
 import software.amazon.awssdk.enhanced.dynamodb.model.ResponseItem;
+import software.amazon.awssdk.enhanced.dynamodb.model.TypeToken;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
+import software.amazon.awssdk.utils.Validate;
 
 /**
  * The default implementation of {@link GeneratedResponseItem}.
@@ -26,25 +29,11 @@ public class DefaultGeneratedResponseItem extends DefaultItem<AttributeValue> im
 
     @Override
     public ResponseItem toResponseItem() {
-        return ResponseItem.builder()
-                           .putAttributes(toConvertableAttributes())
-                           .build();
-    }
-
-    private Map<String, ConvertableItemAttributeValue> toConvertableAttributes() {
         ItemAttributeValue attributeValue = ItemAttributeValue.fromGeneratedItem(attributes());
-
-        Map<String, ConvertableItemAttributeValue> result = new LinkedHashMap<>();
-        attributeValue.asMap().forEach((k, v) -> result.put(k, toConvertableAttribute(k, v)));
-        return result;
-    }
-
-    private ConvertableItemAttributeValue toConvertableAttribute(String key, ItemAttributeValue value) {
-        return DefaultConvertableItemAttributeValue.builder()
-                                                   .conversionContext(cc -> cc.attributeName(key)
-                                                                              .converter(converterChain))
-                                                   .attributeValue(value)
-                                                   .build();
+        Object result = converterChain.fromAttributeValue(attributeValue,
+                                                          TypeToken.from(ResponseItem.class),
+                                                          ConversionContext.builder().converter(converterChain).build());
+        return Validate.isInstanceOf(ResponseItem.class, result, "Conversion chain did not generated a ResponseItem.");
     }
 
     @Override

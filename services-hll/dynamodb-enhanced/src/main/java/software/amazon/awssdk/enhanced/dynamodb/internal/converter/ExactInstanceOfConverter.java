@@ -4,7 +4,6 @@ import software.amazon.awssdk.annotations.SdkInternalApi;
 import software.amazon.awssdk.annotations.ThreadSafe;
 import software.amazon.awssdk.enhanced.dynamodb.converter.ConversionCondition;
 import software.amazon.awssdk.enhanced.dynamodb.converter.ConversionContext;
-import software.amazon.awssdk.enhanced.dynamodb.converter.DefaultConverterChain;
 import software.amazon.awssdk.enhanced.dynamodb.converter.ItemAttributeValueConverter;
 import software.amazon.awssdk.enhanced.dynamodb.model.ItemAttributeValue;
 import software.amazon.awssdk.enhanced.dynamodb.model.TypeToken;
@@ -39,7 +38,7 @@ public abstract class ExactInstanceOfConverter<T> implements ItemAttributeValueC
 
     @Override
     public Object fromAttributeValue(ItemAttributeValue input, TypeToken<?> desiredType, ConversionContext context) {
-        Validate.isTrue(type.equals(desiredType.representedClass()),
+        Validate.isTrue(type.equals(desiredType.rawClass()),
                         "The desired type %s does not equal %s.", desiredType, type);
 
         return doFromAttributeValue(input, desiredType, context);

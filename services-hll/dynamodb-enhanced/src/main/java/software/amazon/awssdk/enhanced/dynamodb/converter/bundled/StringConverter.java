@@ -4,7 +4,11 @@ import static java.util.stream.Collectors.toList;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.function.BinaryOperator;
+import java.util.stream.Collectors;
 import software.amazon.awssdk.annotations.Immutable;
 import software.amazon.awssdk.annotations.SdkPublicApi;
 import software.amazon.awssdk.annotations.ThreadSafe;
@@ -14,6 +18,7 @@ import software.amazon.awssdk.enhanced.dynamodb.internal.converter.ExactInstance
 import software.amazon.awssdk.enhanced.dynamodb.model.ItemAttributeValue;
 import software.amazon.awssdk.enhanced.dynamodb.model.TypeConvertingVisitor;
 import software.amazon.awssdk.enhanced.dynamodb.model.TypeToken;
+import software.amazon.awssdk.utils.BinaryUtils;
 
 /**
  * A converter between {@link String} and {@link ItemAttributeValue}.
@@ -46,7 +51,7 @@ public class StringConverter extends ExactInstanceOfConverter<String> {
 
             @Override
             public String convertBytes(SdkBytes value) {
-                return value.asString(StandardCharsets.UTF_8);
+                return "0x" + BinaryUtils.toHex(value.asByteArray());
             }
 
             @Override
@@ -56,24 +61,41 @@ public class StringConverter extends ExactInstanceOfConverter<String> {
 
             @Override
             public String convertSetOfStrings(List<String> value) {
-                return join(value);
+                return value.toString();
             }
 
             @Override
             public String convertSetOfNumbers(List<String> value) {
-                return join(value);
+                return value.toString();
             }
 
             @Override
             public String convertSetOfBytes(List<SdkBytes> value) {
-                Collection<String> values = value.stream()
-                                                 .map(b -> b.asString(StandardCharsets.UTF_8))
-                                                 .collect(toList());
-                return String.join(", ", values);
+                return value.stream()
+                            .map(this::convertBytes)
+                            .collect(toList())
+                            .toString();
             }
 
-            private String join(Iterable<String> input) {
-                return String.join(", ", input);
+            @Override
+            public String convertMap(Map<String, ItemAttributeValue> value) {
+                BinaryOperator<Object> throwingMerger = (l, r) -> {
+                    // Should not happen: we're converting from map.
+                    throw new IllegalStateException();
+                };
+
+                return value.entrySet().stream()
+                            .collect(Collectors.toMap(i -> i.getKey(), i -> convert(i.getValue()),
+                                                      throwingMerger, LinkedHashMap::new))
+                            .toString();
+            }
+
+            @Override
+            public String convertListOfAttributeValues(Collection<ItemAttributeValue> value) {
+                return value.stream()
+                            .map(this::convert)
+                            .collect(toList())
+                            .toString();
             }
         });
     }

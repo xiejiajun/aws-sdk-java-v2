@@ -87,7 +87,7 @@ public final class ItemAttributeValueConverterChain implements ItemAttributeValu
 
     @Override
     public Object fromAttributeValue(ItemAttributeValue input, TypeToken<?> desiredType, ConversionContext context) {
-        return invokeConverter(desiredType.representedClass(), c -> c.fromAttributeValue(input, desiredType, context));
+        return invokeConverter(desiredType.rawClass(), c -> c.fromAttributeValue(input, desiredType, context));
     }
 
     /**

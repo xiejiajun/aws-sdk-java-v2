@@ -6,6 +6,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import software.amazon.awssdk.annotations.SdkInternalApi;
 import software.amazon.awssdk.annotations.ThreadSafe;
 import software.amazon.awssdk.enhanced.dynamodb.converter.ItemAttributeValueConverter;
@@ -27,8 +28,8 @@ public abstract class DefaultItem<AttributeT> implements ConverterAware,
 
     protected DefaultItem(Builder<AttributeT, ?> builder) {
         this.converters = new ArrayList<>(builder.converters);
-        this.converterChain = ItemAttributeValueConverterChain.create(converters());
         this.attributes = Collections.unmodifiableMap(new LinkedHashMap<>(builder.attributes));
+        this.converterChain = ItemAttributeValueConverterChain.create(converters());
     }
 
     @Override
@@ -44,6 +45,24 @@ public abstract class DefaultItem<AttributeT> implements ConverterAware,
     @Override
     public List<ItemAttributeValueConverter> converters() {
         return Collections.unmodifiableList(converters);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        DefaultItem<?> that = (DefaultItem<?>) o;
+        return attributes.equals(that.attributes) &&
+               converters.equals(that.converters);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(attributes, converters);
     }
 
     public static abstract class Builder<AttributeT, BuilderT extends Builder<AttributeT, BuilderT>>

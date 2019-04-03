@@ -76,9 +76,8 @@ import software.amazon.awssdk.utils.Validate;
 @ThreadSafe
 @Immutable
 public class TypeToken<T> {
-    private final Type runtimeType;
-    private final Class<T> representedClass;
-    private final List<TypeToken<?>> representedClassParameters;
+    private final Class<T> rawClass;
+    private final List<TypeToken<?>> rawClassParameters;
 
     /**
      * Create a type token, capturing the generic type arguments of the token as {@link Class}es.
@@ -95,20 +94,19 @@ public class TypeToken<T> {
             type = captureGenericTypeArguments();
         }
 
-        this.runtimeType = validateIsSupportedType(type);
-        this.representedClass = loadRepresentedClass();
-        this.representedClassParameters = loadRepresentedClassParameters();
+        this.rawClass = validateAndConvert(type);
+        this.rawClassParameters = loadTypeParameters(type);
     }
 
     private static TypeToken<?> from(Type type) {
-        return new TypeToken<>(Validate.paramNotNull(type, "type"));
+        return new TypeToken<>(validateIsSupportedType(type));
     }
 
     /**
      * Create a type token for the provided non-parameterized class.
      */
     public static <T> TypeToken<T> from(Class<T> type) {
-        return new TypeToken<>(Validate.paramNotNull(type, "type"));
+        return new TypeToken<>(validateIsSupportedType(type));
     }
 
     /**
@@ -126,6 +124,7 @@ public class TypeToken<T> {
     }
 
     private static Type validateIsSupportedType(Type type) {
+        Validate.validState(type != null, "Type must not be null.");
         Validate.validState(!(type instanceof GenericArrayType),
                             "Array type %s is not supported. Use java.util.List instead of arrays.", type);
         Validate.validState(!(type instanceof TypeVariable), "Type variable type %s is not supported.", type);
@@ -138,20 +137,20 @@ public class TypeToken<T> {
      *
      * Eg. For {@code TypeToken<String>}, this would return {@code String.class}.
      */
-    public Class<T> representedClass() {
-        return representedClass;
+    public Class<T> rawClass() {
+        return rawClass;
     }
 
     /**
      * Retrieve the {@link Class} objects of any type parameters for the class that this type token represents.
      *
-     * Eg. For {@code TypeToken<List<String>>}, this would return {@code String.class}, and {@link #representedClass()} would
+     * Eg. For {@code TypeToken<List<String>>}, this would return {@code String.class}, and {@link #rawClass()} would
      * return {@code List.class}.
      *
      * If there are no type parameters, this will return an empty list.
      */
-    public List<TypeToken<?>> representedClassParameters() {
-        return representedClassParameters;
+    public List<TypeToken<?>> rawClassParameters() {
+        return rawClassParameters;
     }
 
     private Type captureGenericTypeArguments() {
@@ -163,28 +162,31 @@ public class TypeToken<T> {
         return parameterizedSuperclass.getActualTypeArguments()[0];
     }
 
-    private Class<T> loadRepresentedClass() {
-        if (runtimeType instanceof Class) {
-            return (Class<T>) runtimeType;
-        } else if (runtimeType instanceof ParameterizedType) {
-            ParameterizedType type = (ParameterizedType) runtimeType;
-            return (Class<T>) type.getRawType();
+    private Class<T> validateAndConvert(Type type) {
+        validateIsSupportedType(type);
+
+        if (type instanceof Class) {
+            return (Class<T>) type;
+        } else if (type instanceof ParameterizedType) {
+            ParameterizedType parameterizedType = (ParameterizedType) type;
+            return validateAndConvert(parameterizedType.getRawType());
         } else {
-            throw new IllegalStateException("Unsupported type: " + runtimeType);
+            throw new IllegalStateException("Unsupported type: " + type);
         }
     }
 
-    private List<TypeToken<?>> loadRepresentedClassParameters() {
-        if (!(runtimeType instanceof ParameterizedType)) {
+    private List<TypeToken<?>> loadTypeParameters(Type type) {
+        if (!(type instanceof ParameterizedType)) {
             return Collections.emptyList();
         }
 
-        ParameterizedType type = (ParameterizedType) runtimeType;
+        ParameterizedType parameterizedType = (ParameterizedType) type;
 
         return Collections.unmodifiableList(
-                Arrays.stream(type.getActualTypeArguments())
-                     .map(TypeToken::from)
-                     .collect(Collectors.toList()));
+                Arrays.stream(parameterizedType.getActualTypeArguments())
+                      .peek(t -> Validate.validState(t != null, "Invalid type argument."))
+                      .map(TypeToken::from)
+                      .collect(Collectors.toList()));
     }
 
     @Override
@@ -192,24 +194,24 @@ public class TypeToken<T> {
         if (this == o) {
             return true;
         }
-        if (o == null || getClass() != o.getClass()) {
+        if (!(o instanceof TypeToken)) {
             return false;
         }
         TypeToken<?> typeToken = (TypeToken<?>) o;
-        return representedClass.equals(typeToken.representedClass) &&
-               representedClassParameters.equals(typeToken.representedClassParameters);
+        return rawClass.equals(typeToken.rawClass) &&
+               rawClassParameters.equals(typeToken.rawClassParameters);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(representedClass, representedClassParameters);
+        return Objects.hash(rawClass, rawClassParameters);
     }
 
     @Override
     public String toString() {
         return ToString.builder("TypeToken")
-                       .add("representedClass", representedClass)
-                       .add("representedClassParameters", representedClassParameters)
+                       .add("rawClass", rawClass)
+                       .add("rawClassParameters", rawClassParameters)
                        .build();
     }
 }
