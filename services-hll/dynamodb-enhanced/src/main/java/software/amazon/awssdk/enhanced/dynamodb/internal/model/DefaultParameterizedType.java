@@ -28,7 +28,7 @@ public final class DefaultParameterizedType implements ParameterizedType {
     }
 
     @Override
-    public Type getRawType() {
+    public Class<?> getRawType() {
         return rawType;
     }
 

@@ -113,7 +113,7 @@ public final class ItemAttributeValueConverterChain implements ItemAttributeValu
         }
 
         if (converter == null) {
-            throw new IllegalArgumentException("Converter not found for " + type.getTypeName() + ".");
+            throw new IllegalStateException("Converter not found for " + type.getTypeName() + ".");
         }
 
 

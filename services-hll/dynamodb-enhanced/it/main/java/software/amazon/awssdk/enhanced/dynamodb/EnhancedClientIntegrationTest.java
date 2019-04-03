@@ -1,13 +1,10 @@
-package software.amazon.awssdk.enhanced.dyamodb;
+package software.amazon.awssdk.enhanced.dynamodb;
+
 
 import java.time.Instant;
 import java.util.Collections;
 import org.junit.BeforeClass;
 import org.junit.Test;
-import software.amazon.awssdk.enhanced.dynamodb.AsyncTable;
-import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedAsyncClient;
-import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
-import software.amazon.awssdk.enhanced.dynamodb.Table;
 import software.amazon.awssdk.enhanced.dynamodb.model.ResponseItem;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.KeyType;
