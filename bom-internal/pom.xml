@@ -127,7 +127,7 @@
             <dependency>
                 <groupId>io.netty</groupId>
                 <artifactId>netty-transport-native-epoll</artifactId>
-                <version>${netty.version}</version>
+                <version>4.1.39.Final</version>
                 <classifier>linux-x86_64</classifier>
             </dependency>
             <dependency>
