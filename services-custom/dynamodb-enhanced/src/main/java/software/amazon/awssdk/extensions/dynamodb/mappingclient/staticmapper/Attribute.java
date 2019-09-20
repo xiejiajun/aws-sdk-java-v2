@@ -112,19 +112,19 @@ public class Attribute<T> {
             attributeValueType);
     }
 
-    String getAttributeName() {
+    public String getAttributeName() {
         return attributeName;
     }
 
-    Function<T, AttributeValue> getGetAttributeMethod() {
+    public Function<T, AttributeValue> getGetAttributeMethod() {
         return getAttributeMethod;
     }
 
-    BiConsumer<T, AttributeValue> getUpdateItemMethod() {
+    public BiConsumer<T, AttributeValue> getUpdateItemMethod() {
         return updateItemMethod;
     }
 
-    StaticTableMetadata getTableMetadata() {
+    public StaticTableMetadata getTableMetadata() {
         return tableMetadata;
     }
 

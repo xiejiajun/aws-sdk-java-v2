@@ -281,6 +281,18 @@ public class StaticTableSchema<T> implements TableSchema<T> {
         return isNullAttributeValue(attributeValue) ? null : attributeValue;
     }
 
+    public List<Attribute<T>> getAttributeMappers() {
+        return attributeMappers;
+    }
+
+    public Supplier<T> getNewItemSupplier() {
+        return newItemSupplier;
+    }
+
+    public Map<String, Attribute<T>> getIndexedMappers() {
+        return indexedMappers;
+    }
+
     private T constructNewItem() {
         if (newItemSupplier == null) {
             throw new UnsupportedOperationException("An abstract TableSchema cannot be used to map a database record "
