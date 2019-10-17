@@ -1,3 +1,18 @@
+/*
+ * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License").
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *  http://aws.amazon.com/apache2.0
+ *
+ * or in the "license" file accompanying this file. This file is distributed
+ * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+
 package software.amazon.awssdk.awscore.presigner;
 
 import java.net.URL;
@@ -5,6 +20,8 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+
+import software.amazon.awssdk.annotations.SdkPublicApi;
 import software.amazon.awssdk.core.SdkBytes;
 import software.amazon.awssdk.http.SdkHttpRequest;
 
@@ -12,6 +29,7 @@ import software.amazon.awssdk.http.SdkHttpRequest;
  * A generic presigned request. The isBrowserCompatible method can be used to determine whether this request
  * can be executed by a web browser.
  */
+@SdkPublicApi
 public interface PresignedRequest {
     /**
      * The URL that the presigned request will execute against. The isBrowserCompatible method can be used to
@@ -31,8 +49,6 @@ public interface PresignedRequest {
      * Returns true if the url returned by the url method can be executed in a browser.
      * <p>
      * This is true when the HTTP request method is GET, and hasSignedHeaders and hasSignedPayload are false.
-     * <p>
-     * TODO: This isn't a universally-agreed-upon-good method name. We should iterate on it before GA.
      */
     boolean isBrowserCompatible();
 
@@ -44,9 +60,9 @@ public interface PresignedRequest {
 
     /**
      * Returns the subset of headers that were signed, and MUST be included in the presigned request to prevent
-     * the request from failing.
+     * the request from failing, or Optional.empty() if hasSignedHeaders if false.
      */
-    Map<String, List<String>> signedHeaders();
+    Optional<Map<String, List<String>>> signedHeaders();
 
     /**
      * Returns true if there is a signed payload in the request. Requests with signed payloads must have those
@@ -67,6 +83,10 @@ public interface PresignedRequest {
      */
     SdkHttpRequest httpRequest();
 
+    /**
+     * Base interface that must be implemented by any builder that builds a class that implements
+     * {@link PresignedRequest}.
+     */
     interface Builder {
         /**
          * Specifies the URL that the presigned request will execute against. The isBrowserCompatible method can be used to
@@ -83,31 +103,10 @@ public interface PresignedRequest {
         Builder expiration(Instant expiration);
 
         /**
-         * Returns true if the url returned by the url method can be executed in a browser.
-         * <p>
-         * This is true when the HTTP request method is GET, and hasSignedHeaders and hasSignedPayload are false.
-         * <p>
-         * TODO: This isn't a universally-agreed-upon-good method name. We should iterate on it before GA.
-         */
-        Builder isBrowserCompatible(boolean isBrowserCompatible);
-
-        /**
-         * Returns true if there are signed headers in the request. Requests with signed headers must have those
-         * headers sent along with the request to prevent a "signature mismatch" error from the service.
-         */
-        Builder hasSignedHeaders(boolean hasSignedHeaders);
-
-        /**
          * Returns the subset of headers that were signed, and MUST be included in the presigned request to prevent
          * the request from failing.
          */
         Builder signedHeaders(Map<String, List<String>> signedHeaders);
-
-        /**
-         * Returns true if there is a signed payload in the request. Requests with signed payloads must have those
-         * payloads sent along with the request to prevent a "signature mismatch" error from the service.
-         */
-        Builder hasSignedPayload(boolean hasSignedPayload);
 
         /**
          * Returns the payload that was signed, or Optional.empty() if hasSignedPayload is false.
@@ -122,6 +121,10 @@ public interface PresignedRequest {
          */
         Builder httpRequest(SdkHttpRequest httpRequest);
 
+        /**
+         * Builds a new object that implements {@link PresignedRequest}.
+         * @return A {@link PresignedRequest} object.
+         */
         PresignedRequest build();
     }
 }

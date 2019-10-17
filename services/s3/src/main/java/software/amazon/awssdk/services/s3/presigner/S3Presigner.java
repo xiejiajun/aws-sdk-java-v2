@@ -12,9 +12,13 @@
  * express or implied. See the License for the specific language governing
  * permissions and limitations under the License.
  */
+
 package software.amazon.awssdk.services.s3.presigner;
 
 import java.net.URL;
+import java.util.Optional;
+
+import software.amazon.awssdk.annotations.SdkPublicApi;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
@@ -22,6 +26,10 @@ import software.amazon.awssdk.regions.providers.DefaultAwsRegionProviderChain;
 import software.amazon.awssdk.regions.providers.LazyAwsRegionProvider;
 import software.amazon.awssdk.utils.Validate;
 
+/**
+ * Client that can be used to generate presigned requests for S3.
+ */
+@SdkPublicApi
 public final class S3Presigner {
 
     private final Region region;
@@ -34,24 +42,81 @@ public final class S3Presigner {
         this.endpointOverride = b.endpointOverride;
     }
 
+    /**
+     * The AWS region associated with this presigner. Will be used to determine the endpoint and signing region for the
+     * presigned requests if no overrides are additionally specified.
+     */
     public Region region() {
         return region;
     }
 
+    /**
+     * The AWS credentials provider to generate credentials from to be included with the presigned request. When the
+     * presigned request is eventually executed, these are the credentials that will be used for the actual service
+     * call.
+     */
     public AwsCredentialsProvider credentialsProvider() {
         return credentialsProvider;
     }
 
-    public URL endpointOverride() {
-        return endpointOverride;
+    /**
+     * If provided, will override the endpoint used in all generated presigned requests. If not provided, the
+     * endpoint will be the default based on the region.
+     */
+    public Optional<URL> endpointOverride() {
+        return Optional.ofNullable(endpointOverride);
     }
 
+    /**
+     * Constructs a {@link Builder} object initialized with values of the properties of this object.
+     */
+    public Builder toBuilder() {
+        return builder().endpointOverride(this.endpointOverride)
+                        .credentialsProvider(this.credentialsProvider)
+                        .region(this.region);
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+
+        S3Presigner that = (S3Presigner) o;
+
+        if (! region.equals(that.region)) {
+            return false;
+        }
+        if (! credentialsProvider.equals(that.credentialsProvider)) {
+            return false;
+        }
+        return endpointOverride != null ? endpointOverride.equals(that.endpointOverride) : that.endpointOverride == null;
+    }
+
+    @Override
+    public int hashCode() {
+        int result = region.hashCode();
+        result = 31 * result + credentialsProvider.hashCode();
+        result = 31 * result + (endpointOverride != null ? endpointOverride.hashCode() : 0);
+        return result;
+    }
+
+    /**
+     * Constructs a new instance of an {@link S3Presigner} using default chains to determine the values for required
+     * properties such as the region and credentials provider.
+     */
     public static S3Presigner create() {
         return new BuilderImpl().region(new LazyAwsRegionProvider(DefaultAwsRegionProviderChain::new).getRegion())
                                 .credentialsProvider(DefaultCredentialsProvider.create())
                                 .build();
     }
 
+    /**
+     * Constructs a newly initialized {@link Builder} object.
+     */
     public static Builder builder() {
         return new BuilderImpl();
     }
@@ -82,7 +147,7 @@ public final class S3Presigner {
 
         @Override
         public Builder credentialsProvider(AwsCredentialsProvider awsCredentialsProvider) {
-            this.credentialsProvider = credentialsProvider;
+            this.credentialsProvider = awsCredentialsProvider;
             return this;
         }
 

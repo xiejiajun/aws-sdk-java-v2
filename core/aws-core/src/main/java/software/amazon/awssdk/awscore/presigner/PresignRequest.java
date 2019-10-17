@@ -12,10 +12,17 @@
  * express or implied. See the License for the specific language governing
  * permissions and limitations under the License.
  */
+
 package software.amazon.awssdk.awscore.presigner;
 
 import java.time.Duration;
 
+import software.amazon.awssdk.annotations.SdkPublicApi;
+
+/**
+ * Base interface for a request made to a specific client 'presigner' to generate presigned requests.
+ */
+@SdkPublicApi
 public interface PresignRequest {
 
     /**
@@ -24,6 +31,10 @@ public interface PresignRequest {
      */
     Duration signatureDuration();
 
+    /**
+     * Base interface that must be implemented by any builder that builds a class that implements
+     * {@link PresignRequest}.
+     */
     interface Builder {
 
         /**
@@ -32,6 +43,10 @@ public interface PresignRequest {
          */
         Builder signatureDuration(Duration signatureDuration);
 
+        /**
+         * Builds a new object that implements {@link PresignRequest}.
+         * @return A {@link PresignRequest} object.
+         */
         PresignRequest build();
     }
 }

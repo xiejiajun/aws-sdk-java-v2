@@ -12,6 +12,7 @@
  * express or implied. See the License for the specific language governing
  * permissions and limitations under the License.
  */
+
 package software.amazon.awssdk.services.s3.presigner;
 
 import java.net.URL;
@@ -19,30 +20,33 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+
+import software.amazon.awssdk.annotations.SdkPublicApi;
 import software.amazon.awssdk.awscore.presigner.PresignedRequest;
 import software.amazon.awssdk.core.SdkBytes;
+import software.amazon.awssdk.http.SdkHttpMethod;
 import software.amazon.awssdk.http.SdkHttpRequest;
 import software.amazon.awssdk.utils.Validate;
 
+/**
+ * A presigned S3 'GetObject' request.
+ * <p>
+ * See {@link PresignedRequest} for a full description of each property of this class.
+ */
+@SdkPublicApi
 public class PresignedGetObjectRequest implements PresignedRequest {
 
     private final URL url;
     private final Instant expiration;
-    private final boolean isBrowserCompatible;
-    private final boolean hasSignedHeaders;
     private final Map<String, List<String>> signedHeaders;
-    private final boolean hasSignedPayload;
-    private final Optional<SdkBytes> signedPayload;
+    private final SdkBytes signedPayload;
     private final SdkHttpRequest httpRequest;
 
     private PresignedGetObjectRequest(Builder b) {
         this.url = Validate.notNull(b.url, "url");
         this.expiration = Validate.notNull(b.expiration, "expiration");
-        this.isBrowserCompatible = b.isBrowserCompatible;
-        this.hasSignedHeaders = b.hasSignedHeaders;
-        this.signedHeaders = Validate.notEmpty(b.signedHeaders, "signedHeaders");
-        this.hasSignedPayload = b.hasSignedPayload;
-        this.signedPayload = Validate.notNull(b.signedPayload, "signedPayload");
+        this.signedHeaders = b.signedHeaders;
+        this.signedPayload = b.signedPayload;
         this.httpRequest = Validate.notNull(b.httpRequest, "httpRequest");
     }
 
@@ -58,27 +62,27 @@ public class PresignedGetObjectRequest implements PresignedRequest {
 
     @Override
     public boolean isBrowserCompatible() {
-        return isBrowserCompatible;
+        return this.httpRequest.method() == SdkHttpMethod.GET && !hasSignedHeaders() && !hasSignedPayload();
     }
 
     @Override
     public boolean hasSignedHeaders() {
-        return hasSignedHeaders;
+        return this.signedHeaders != null;
     }
 
     @Override
-    public Map<String, List<String>> signedHeaders() {
-        return signedHeaders;
+    public Optional<Map<String, List<String>>> signedHeaders() {
+        return Optional.ofNullable(signedHeaders);
     }
 
     @Override
     public boolean hasSignedPayload() {
-        return hasSignedPayload;
+        return this.signedPayload != null;
     }
 
     @Override
     public Optional<SdkBytes> signedPayload() {
-        return signedPayload;
+        return Optional.ofNullable(signedPayload);
     }
 
     @Override
@@ -86,30 +90,66 @@ public class PresignedGetObjectRequest implements PresignedRequest {
         return httpRequest;
     }
 
+    /**
+     * Constructs a {@link Builder} object initialized with values of the properties of this object.
+     */
     public Builder toBuilder() {
         return new Builder().expiration(expiration)
-                            .hasSignedHeaders(hasSignedHeaders)
-                            .hasSignedPayload(hasSignedPayload)
                             .httpRequest(httpRequest)
-                            .isBrowserCompatible(isBrowserCompatible)
                             .url(url)
                             .signedHeaders(signedHeaders)
-                            .signedPayload(signedPayload.orElse(null));
+                            .signedPayload(signedPayload);
     }
 
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+
+        PresignedGetObjectRequest that = (PresignedGetObjectRequest) o;
+
+        if (! url.equals(that.url)) {
+            return false;
+        }
+        if (! expiration.equals(that.expiration)) {
+            return false;
+        }
+        if (signedHeaders != null ? ! signedHeaders.equals(that.signedHeaders) : that.signedHeaders != null) {
+            return false;
+        }
+        if (signedPayload != null ? ! signedPayload.equals(that.signedPayload) : that.signedPayload != null) {
+            return false;
+        }
+
+        return httpRequest.equals(that.httpRequest);
+    }
+
+    @Override
+    public int hashCode() {
+        int result = url.hashCode();
+        result = 31 * result + expiration.hashCode();
+        result = 31 * result + (signedHeaders != null ? signedHeaders.hashCode() : 0);
+        result = 31 * result + (signedPayload != null ? signedPayload.hashCode() : 0);
+        result = 31 * result + httpRequest.hashCode();
+        return result;
+    }
+
+    /**
+     * Constructs a newly initialized {@link Builder} object.
+     */
     public static Builder builder() {
         return new Builder();
     }
 
     public static final class Builder implements PresignedRequest.Builder {
-
         private URL url;
         private Instant expiration;
-        private boolean isBrowserCompatible;
-        private boolean hasSignedHeaders;
         private Map<String, List<String>> signedHeaders;
-        private boolean hasSignedPayload;
-        private Optional<SdkBytes> signedPayload;
+        private SdkBytes signedPayload;
         private SdkHttpRequest httpRequest;
 
         private Builder() {}
@@ -127,32 +167,14 @@ public class PresignedGetObjectRequest implements PresignedRequest {
         }
 
         @Override
-        public Builder isBrowserCompatible(boolean isBrowserCompatible) {
-            this.isBrowserCompatible = isBrowserCompatible;
-            return this;
-        }
-
-        @Override
-        public Builder hasSignedHeaders(boolean hasSignedHeaders) {
-            this.hasSignedHeaders = hasSignedHeaders;
-            return this;
-        }
-
-        @Override
         public Builder signedHeaders(Map<String, List<String>> signedHeaders) {
             this.signedHeaders = signedHeaders;
             return this;
         }
 
         @Override
-        public Builder hasSignedPayload(boolean hasSignedPayload) {
-            this.hasSignedPayload = hasSignedPayload;
-            return this;
-        }
-
-        @Override
         public Builder signedPayload(SdkBytes signedPayload) {
-            this.signedPayload = Optional.ofNullable(signedPayload);
+            this.signedPayload = signedPayload;
             return this;
         }
 
@@ -163,7 +185,7 @@ public class PresignedGetObjectRequest implements PresignedRequest {
         }
 
         @Override
-        public PresignedRequest build() {
+        public PresignedGetObjectRequest build() {
             return new PresignedGetObjectRequest(this);
         }
     }
