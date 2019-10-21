@@ -19,7 +19,7 @@ import software.amazon.awssdk.awscore.presigner.PresignRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.utils.Validate;
 
-public class GetObjectPresignRequest implements PresignRequest {
+public class GetObjectPresignRequest extends PresignRequest {
 
     private final GetObjectRequest getObjectRequest;
 

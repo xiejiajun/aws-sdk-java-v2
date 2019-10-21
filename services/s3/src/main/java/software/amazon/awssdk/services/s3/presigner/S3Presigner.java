@@ -15,85 +15,37 @@
 package software.amazon.awssdk.services.s3.presigner;
 
 import java.net.URL;
+import software.amazon.awssdk.annotations.Immutable;
+import software.amazon.awssdk.annotations.NotThreadSafe;
+import software.amazon.awssdk.annotations.SdkPublicApi;
+import software.amazon.awssdk.annotations.ThreadSafe;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
-import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
-import software.amazon.awssdk.regions.providers.DefaultAwsRegionProviderChain;
-import software.amazon.awssdk.regions.providers.LazyAwsRegionProvider;
-import software.amazon.awssdk.utils.Validate;
+import software.amazon.awssdk.services.s3.internal.presigner.DefaultS3Presigner;
 
-public final class S3Presigner {
-
-    private final Region region;
-    private final AwsCredentialsProvider credentialsProvider;
-    private final URL endpointOverride;
-
-    private S3Presigner(BuilderImpl b) {
-        this.region = Validate.notNull(b.region, "region");
-        this.credentialsProvider = Validate.notNull(b.credentialsProvider, "credentialsProvider");
-        this.endpointOverride = b.endpointOverride;
+@SdkPublicApi
+@Immutable
+@ThreadSafe
+public interface S3Presigner {
+    static S3Presigner create() {
+        return DefaultS3Presigner.create();
     }
 
-    public Region region() {
-        return region;
+    static Builder builder() {
+        return DefaultS3Presigner.builder();
     }
 
-    public AwsCredentialsProvider credentialsProvider() {
-        return credentialsProvider;
-    }
 
-    public URL endpointOverride() {
-        return endpointOverride;
-    }
 
-    public static S3Presigner create() {
-        return new BuilderImpl().region(new LazyAwsRegionProvider(DefaultAwsRegionProviderChain::new).getRegion())
-                                .credentialsProvider(DefaultCredentialsProvider.create())
-                                .build();
-    }
-
-    public static Builder builder() {
-        return new BuilderImpl();
-    }
-
+    @SdkPublicApi
+    @NotThreadSafe
     interface Builder {
         Builder region(Region region);
 
-        Builder credentialsProvider(AwsCredentialsProvider awsCredentialsProvider);
+        Builder credentialsProvider(AwsCredentialsProvider credentialsProvider);
 
         Builder endpointOverride(URL endpointOverride);
 
         S3Presigner build();
-    }
-
-    public static final class BuilderImpl implements Builder {
-
-        private Region region;
-        private AwsCredentialsProvider credentialsProvider;
-        private URL endpointOverride;
-
-        private BuilderImpl() {}
-
-        @Override
-        public Builder region(Region region) {
-            this.region = region;
-            return this;
-        }
-
-        @Override
-        public Builder credentialsProvider(AwsCredentialsProvider awsCredentialsProvider) {
-            this.credentialsProvider = credentialsProvider;
-            return this;
-        }
-
-        @Override
-        public Builder endpointOverride(URL endpointOverride) {
-            this.endpointOverride = endpointOverride;
-            return this;
-        }
-
-        public S3Presigner build() {
-            return new S3Presigner(this);
-        }
     }
 }
