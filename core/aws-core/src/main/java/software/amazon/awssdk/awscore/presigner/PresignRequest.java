@@ -15,12 +15,13 @@
 package software.amazon.awssdk.awscore.presigner;
 
 import java.time.Duration;
+import software.amazon.awssdk.utils.Validate;
 
 public abstract class PresignRequest {
     private final Duration signatureDuration;
 
     protected PresignRequest(DefaultBuilder builder) {
-        this.signatureDuration = builder.signatureDuration;
+        this.signatureDuration = Validate.paramNotNull(builder.signatureDuration, "signatureDuration");
     }
 
     public Duration signatureDuration() {
@@ -44,6 +45,12 @@ public abstract class PresignRequest {
 
     protected abstract static class DefaultBuilder implements Builder {
         private Duration signatureDuration;
+
+        protected DefaultBuilder() {}
+
+        protected DefaultBuilder(PresignRequest request) {
+            this.signatureDuration = request.signatureDuration;
+        }
 
         /**
          * The duration for which this presigned request should be valid. After this time has

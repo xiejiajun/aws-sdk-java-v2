@@ -18,152 +18,100 @@ import java.net.URL;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
+import software.amazon.awssdk.annotations.Immutable;
+import software.amazon.awssdk.annotations.NotThreadSafe;
+import software.amazon.awssdk.annotations.SdkInternalApi;
+import software.amazon.awssdk.annotations.SdkPublicApi;
+import software.amazon.awssdk.annotations.ThreadSafe;
 import software.amazon.awssdk.awscore.presigner.PresignedRequest;
 import software.amazon.awssdk.core.SdkBytes;
 import software.amazon.awssdk.http.SdkHttpRequest;
-import software.amazon.awssdk.utils.Validate;
+import software.amazon.awssdk.utils.builder.CopyableBuilder;
+import software.amazon.awssdk.utils.builder.ToCopyableBuilder;
 
-public class PresignedGetObjectRequest implements PresignedRequest {
-
-    private final URL url;
-    private final Instant expiration;
-    private final boolean isBrowserCompatible;
-    private final boolean hasSignedHeaders;
-    private final Map<String, List<String>> signedHeaders;
-    private final boolean hasSignedPayload;
-    private final Optional<SdkBytes> signedPayload;
-    private final SdkHttpRequest httpRequest;
-
-    private PresignedGetObjectRequest(Builder b) {
-        this.url = Validate.notNull(b.url, "url");
-        this.expiration = Validate.notNull(b.expiration, "expiration");
-        this.isBrowserCompatible = b.isBrowserCompatible;
-        this.hasSignedHeaders = b.hasSignedHeaders;
-        this.signedHeaders = Validate.notEmpty(b.signedHeaders, "signedHeaders");
-        this.hasSignedPayload = b.hasSignedPayload;
-        this.signedPayload = Validate.notNull(b.signedPayload, "signedPayload");
-        this.httpRequest = Validate.notNull(b.httpRequest, "httpRequest");
-    }
-
-    @Override
-    public URL url() {
-        return url;
-    }
-
-    @Override
-    public Instant expiration() {
-        return expiration;
-    }
-
-    @Override
-    public boolean isBrowserCompatible() {
-        return isBrowserCompatible;
-    }
-
-    @Override
-    public boolean hasSignedHeaders() {
-        return hasSignedHeaders;
-    }
-
-    @Override
-    public Map<String, List<String>> signedHeaders() {
-        return signedHeaders;
-    }
-
-    @Override
-    public boolean hasSignedPayload() {
-        return hasSignedPayload;
-    }
-
-    @Override
-    public Optional<SdkBytes> signedPayload() {
-        return signedPayload;
-    }
-
-    @Override
-    public SdkHttpRequest httpRequest() {
-        return httpRequest;
-    }
-
-    public Builder toBuilder() {
-        return new Builder().expiration(expiration)
-                            .hasSignedHeaders(hasSignedHeaders)
-                            .hasSignedPayload(hasSignedPayload)
-                            .httpRequest(httpRequest)
-                            .isBrowserCompatible(isBrowserCompatible)
-                            .url(url)
-                            .signedHeaders(signedHeaders)
-                            .signedPayload(signedPayload.orElse(null));
+@SdkPublicApi
+@Immutable
+@ThreadSafe
+public class PresignedGetObjectRequest
+        extends PresignedRequest
+        implements ToCopyableBuilder<PresignedGetObjectRequest.Builder, PresignedGetObjectRequest> {
+    private PresignedGetObjectRequest(DefaultBuilder builder) {
+        super(builder);
     }
 
     public static Builder builder() {
-        return new Builder();
+        return new DefaultBuilder();
     }
 
-    public static final class Builder implements PresignedRequest.Builder {
+    public Builder toBuilder() {
+        return new DefaultBuilder(this);
+    }
 
-        private URL url;
-        private Instant expiration;
-        private boolean isBrowserCompatible;
-        private boolean hasSignedHeaders;
-        private Map<String, List<String>> signedHeaders;
-        private boolean hasSignedPayload;
-        private Optional<SdkBytes> signedPayload;
-        private SdkHttpRequest httpRequest;
+    @SdkPublicApi
+    @NotThreadSafe
+    public interface Builder extends PresignedRequest.Builder,
+                                     CopyableBuilder<PresignedGetObjectRequest.Builder, PresignedGetObjectRequest> {
+        @Override
+        Builder url(URL url);
 
-        private Builder() {}
-    
+        @Override
+        Builder expiration(Instant expiration);
+
+        @Override
+        Builder signedHeaders(Map<String, List<String>> signedHeaders);
+
+        @Override
+        Builder signedPayload(SdkBytes signedPayload);
+
+        @Override
+        Builder httpRequest(SdkHttpRequest httpRequest);
+
+        @Override
+        PresignedGetObjectRequest build();
+    }
+
+    @SdkInternalApi
+    private static final class DefaultBuilder
+            extends PresignedRequest.DefaultBuilder
+            implements Builder {
+        private DefaultBuilder() { }
+
+        private DefaultBuilder(PresignedGetObjectRequest request) {
+            super(request);
+        }
+
         @Override
         public Builder url(URL url) {
-            this.url = url;
+            super.url(url);
             return this;
         }
 
         @Override
         public Builder expiration(Instant expiration) {
-            this.expiration = expiration;
-            return this;
-        }
-
-        @Override
-        public Builder isBrowserCompatible(boolean isBrowserCompatible) {
-            this.isBrowserCompatible = isBrowserCompatible;
-            return this;
-        }
-
-        @Override
-        public Builder hasSignedHeaders(boolean hasSignedHeaders) {
-            this.hasSignedHeaders = hasSignedHeaders;
+            super.expiration(expiration);
             return this;
         }
 
         @Override
         public Builder signedHeaders(Map<String, List<String>> signedHeaders) {
-            this.signedHeaders = signedHeaders;
-            return this;
-        }
-
-        @Override
-        public Builder hasSignedPayload(boolean hasSignedPayload) {
-            this.hasSignedPayload = hasSignedPayload;
+            super.signedHeaders(signedHeaders);
             return this;
         }
 
         @Override
         public Builder signedPayload(SdkBytes signedPayload) {
-            this.signedPayload = Optional.ofNullable(signedPayload);
+            super.signedPayload(signedPayload);
             return this;
         }
 
         @Override
         public Builder httpRequest(SdkHttpRequest httpRequest) {
-            this.httpRequest = httpRequest;
+            super.httpRequest(httpRequest);
             return this;
         }
 
         @Override
-        public PresignedRequest build() {
+        public PresignedGetObjectRequest build() {
             return new PresignedGetObjectRequest(this);
         }
     }

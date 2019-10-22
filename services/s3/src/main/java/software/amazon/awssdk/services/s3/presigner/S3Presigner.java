@@ -20,13 +20,15 @@ import software.amazon.awssdk.annotations.NotThreadSafe;
 import software.amazon.awssdk.annotations.SdkPublicApi;
 import software.amazon.awssdk.annotations.ThreadSafe;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
+import software.amazon.awssdk.awscore.presigner.SdkPresigner;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.internal.presigner.DefaultS3Presigner;
+import software.amazon.awssdk.utils.SdkAutoCloseable;
 
 @SdkPublicApi
 @Immutable
 @ThreadSafe
-public interface S3Presigner {
+public interface S3Presigner extends SdkPresigner, SdkAutoCloseable {
     static S3Presigner create() {
         return DefaultS3Presigner.create();
     }
@@ -35,11 +37,11 @@ public interface S3Presigner {
         return DefaultS3Presigner.builder();
     }
 
-
+    PresignedGetObjectRequest presignGetObject(GetObjectPresignRequest request);
 
     @SdkPublicApi
     @NotThreadSafe
-    interface Builder {
+    interface Builder extends SdkPresigner.Builder {
         Builder region(Region region);
 
         Builder credentialsProvider(AwsCredentialsProvider credentialsProvider);

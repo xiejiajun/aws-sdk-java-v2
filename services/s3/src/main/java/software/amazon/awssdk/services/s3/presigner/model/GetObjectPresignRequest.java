@@ -43,8 +43,7 @@ public final class GetObjectPresignRequest
 
     @Override
     public Builder toBuilder() {
-        return super.toBuilder(builder())
-                    .getObjectRequest(getObjectRequest);
+        return new DefaultBuilder(this);
     }
 
     public interface Builder extends PresignRequest.Builder,
@@ -60,6 +59,13 @@ public final class GetObjectPresignRequest
 
     private static final class DefaultBuilder extends PresignRequest.DefaultBuilder implements Builder {
         private GetObjectRequest getObjectRequest;
+
+        private DefaultBuilder() {}
+
+        private DefaultBuilder(GetObjectPresignRequest request) {
+            super(request);
+            this.getObjectRequest = request.getObjectRequest;
+        }
 
         @Override
         public Builder signatureDuration(Duration signatureDuration) {
