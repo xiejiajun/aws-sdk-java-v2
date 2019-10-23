@@ -16,9 +16,11 @@
 package software.amazon.awssdk.services.s3.presigner.model;
 
 import java.time.Duration;
+import java.util.function.Consumer;
 import software.amazon.awssdk.annotations.SdkPublicApi;
 import software.amazon.awssdk.awscore.presigner.PresignRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.utils.Validate;
 import software.amazon.awssdk.utils.builder.CopyableBuilder;
 import software.amazon.awssdk.utils.builder.ToCopyableBuilder;
 
@@ -30,7 +32,7 @@ public final class GetObjectPresignRequest
 
     private GetObjectPresignRequest(DefaultBuilder builder) {
         super(builder);
-        this.getObjectRequest = builder.getObjectRequest;
+        this.getObjectRequest = Validate.notNull(builder.getObjectRequest, "getObjectRequest");
     }
 
     public static Builder builder() {
@@ -49,6 +51,12 @@ public final class GetObjectPresignRequest
     public interface Builder extends PresignRequest.Builder,
                                      CopyableBuilder<GetObjectPresignRequest.Builder, GetObjectPresignRequest> {
         Builder getObjectRequest(GetObjectRequest getObjectRequest);
+
+        default Builder getObjectRequest(Consumer<GetObjectRequest.Builder> getObjectRequest) {
+            GetObjectRequest.Builder builder = GetObjectRequest.builder();
+            getObjectRequest.accept(builder);
+            return getObjectRequest(builder.build());
+        }
 
         @Override
         Builder signatureDuration(Duration signatureDuration);
@@ -81,7 +89,7 @@ public final class GetObjectPresignRequest
 
         @Override
         public GetObjectPresignRequest build() {
-            return null;
+            return new GetObjectPresignRequest(this);
         }
     }
 }

@@ -12,7 +12,8 @@
  * express or implied. See the License for the specific language governing
  * permissions and limitations under the License.
  */
-package software.amazon.awssdk.services.s3.presigner;
+
+package software.amazon.awssdk.services.s3.presigner.model;
 
 import java.net.URL;
 import java.time.Instant;
@@ -58,6 +59,9 @@ public class PresignedGetObjectRequest
         Builder expiration(Instant expiration);
 
         @Override
+        Builder isBrowserCompatible(Boolean isBrowserCompatible);
+
+        @Override
         Builder signedHeaders(Map<String, List<String>> signedHeaders);
 
         @Override
@@ -89,6 +93,12 @@ public class PresignedGetObjectRequest
         @Override
         public Builder expiration(Instant expiration) {
             super.expiration(expiration);
+            return this;
+        }
+
+        @Override
+        public Builder isBrowserCompatible(Boolean isBrowserCompatible) {
+            super.isBrowserCompatible(isBrowserCompatible);
             return this;
         }
 

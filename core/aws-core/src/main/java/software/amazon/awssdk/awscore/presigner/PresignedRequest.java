@@ -7,7 +7,6 @@ import java.util.Map;
 import java.util.Optional;
 import software.amazon.awssdk.annotations.SdkPublicApi;
 import software.amazon.awssdk.core.SdkBytes;
-import software.amazon.awssdk.http.SdkHttpMethod;
 import software.amazon.awssdk.http.SdkHttpRequest;
 import software.amazon.awssdk.utils.Validate;
 
@@ -19,6 +18,7 @@ import software.amazon.awssdk.utils.Validate;
 public abstract class PresignedRequest {
     private final URL url;
     private final Instant expiration;
+    private final boolean isBrowserCompatible;
     private final Map<String, List<String>> signedHeaders;
     private final Optional<SdkBytes> signedPayload;
     private final SdkHttpRequest httpRequest;
@@ -26,6 +26,7 @@ public abstract class PresignedRequest {
     protected PresignedRequest(DefaultBuilder builder) {
         this.url = Validate.notNull(builder.url, "url");
         this.expiration = Validate.notNull(builder.expiration, "expiration");
+        this.isBrowserCompatible = Validate.notNull(builder.isBrowserCompatible, "isBrowserCompatible");
         this.signedHeaders = Validate.notEmpty(builder.signedHeaders, "signedHeaders");
         this.signedPayload = Validate.notNull(builder.signedPayload, "signedPayload");
         this.httpRequest = Validate.notNull(builder.httpRequest, "httpRequest");
@@ -57,15 +58,7 @@ public abstract class PresignedRequest {
      * TODO: This isn't a universally-agreed-upon-good method name. We should iterate on it before GA.
      */
     public boolean isBrowserCompatible() {
-        return !hasSignedHeaders() && !hasSignedHeaders() && httpRequest().method() == SdkHttpMethod.GET;
-    }
-
-    /**
-     * Returns true if there are signed headers in the request. Requests with signed headers must have those
-     * headers sent along with the request to prevent a "signature mismatch" error from the service.
-     */
-    public boolean hasSignedHeaders() {
-        return signedHeaders.isEmpty();
+        return isBrowserCompatible;
     }
 
     /**
@@ -74,14 +67,6 @@ public abstract class PresignedRequest {
      */
     public Map<String, List<String>> signedHeaders() {
         return signedHeaders;
-    }
-
-    /**
-     * Returns true if there is a signed payload in the request. Requests with signed payloads must have those
-     * payloads sent along with the request to prevent a "signature mismatch" error from the service.
-     */
-    public boolean hasSignedPayload() {
-        return signedPayload().isPresent();
     }
 
     /**
@@ -117,6 +102,11 @@ public abstract class PresignedRequest {
         Builder expiration(Instant expiration);
 
         /**
+         * Whether the url returned by the url method can be executed in a browser.
+         */
+        Builder isBrowserCompatible(Boolean isBrowserCompatible);
+
+        /**
          * Returns the subset of headers that were signed, and MUST be included in the presigned request to prevent
          * the request from failing.
          */
@@ -141,6 +131,7 @@ public abstract class PresignedRequest {
     protected abstract static class DefaultBuilder implements Builder {
         private URL url;
         private Instant expiration;
+        private Boolean isBrowserCompatible;
         private Map<String, List<String>> signedHeaders;
         private Optional<SdkBytes> signedPayload;
         private SdkHttpRequest httpRequest;
@@ -150,6 +141,7 @@ public abstract class PresignedRequest {
         protected DefaultBuilder(PresignedRequest request) {
             this.url = request.url;
             this.expiration = request.expiration;
+            this.isBrowserCompatible = request.isBrowserCompatible;
             this.signedHeaders = request.signedHeaders;
             this.signedPayload = request.signedPayload;
             this.httpRequest = request.httpRequest;
@@ -164,6 +156,12 @@ public abstract class PresignedRequest {
         @Override
         public Builder expiration(Instant expiration) {
             this.expiration = expiration;
+            return this;
+        }
+
+        @Override
+        public Builder isBrowserCompatible(Boolean isBrowserCompatible) {
+            this.isBrowserCompatible = isBrowserCompatible;
             return this;
         }
 

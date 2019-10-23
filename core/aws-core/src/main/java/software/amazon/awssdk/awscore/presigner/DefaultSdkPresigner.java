@@ -15,7 +15,10 @@
 
 package software.amazon.awssdk.awscore.presigner;
 
+import java.net.URI;
 import java.net.URL;
+import software.amazon.awssdk.annotations.SdkInternalApi;
+import software.amazon.awssdk.annotations.SdkProtectedApi;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
@@ -23,13 +26,14 @@ import software.amazon.awssdk.regions.providers.DefaultAwsRegionProviderChain;
 import software.amazon.awssdk.regions.providers.LazyAwsRegionProvider;
 import software.amazon.awssdk.utils.IoUtils;
 
+@SdkInternalApi
 public abstract class DefaultSdkPresigner implements SdkPresigner {
     private static final LazyAwsRegionProvider DEFAULT_REGION_PROVIDER =
             new LazyAwsRegionProvider(DefaultAwsRegionProviderChain::new);
 
     protected final Region region;
     protected final AwsCredentialsProvider credentialsProvider;
-    protected final URL endpointOverride;
+    protected final URI endpointOverride;
 
     protected DefaultSdkPresigner(Builder b) {
         this.region = b.region != null ? b.region : DEFAULT_REGION_PROVIDER.getRegion();
@@ -42,12 +46,12 @@ public abstract class DefaultSdkPresigner implements SdkPresigner {
         IoUtils.closeIfCloseable(credentialsProvider, null);
     }
 
-    public static abstract class Builder implements SdkPresigner.Builder {
+    public abstract static class Builder implements SdkPresigner.Builder {
         private Region region;
         private AwsCredentialsProvider credentialsProvider;
-        private URL endpointOverride;
+        private URI endpointOverride;
 
-        private Builder() {}
+        protected Builder() {}
 
         @Override
         public Builder region(Region region) {
@@ -62,7 +66,7 @@ public abstract class DefaultSdkPresigner implements SdkPresigner {
         }
 
         @Override
-        public Builder endpointOverride(URL endpointOverride) {
+        public Builder endpointOverride(URI endpointOverride) {
             this.endpointOverride = endpointOverride;
             return this;
         }

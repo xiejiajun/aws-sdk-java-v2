@@ -15,8 +15,11 @@
 package software.amazon.awssdk.awscore.presigner;
 
 import java.time.Duration;
+import java.time.Instant;
+import software.amazon.awssdk.annotations.SdkPublicApi;
 import software.amazon.awssdk.utils.Validate;
 
+@SdkPublicApi
 public abstract class PresignRequest {
     private final Duration signatureDuration;
 
@@ -28,15 +31,12 @@ public abstract class PresignRequest {
         return this.signatureDuration;
     }
 
-    protected <T extends Builder> T toBuilder(T builder) {
-        builder.signatureDuration(signatureDuration);
-        return builder;
-    }
-
     public interface Builder {
         /**
          * Specifies the duration for which this presigned request should be valid. After this time has
-         * expired, attempting to use the presigned request will fail.
+         * expired, attempting to use the presigned request will fail. 
+         * <p>
+         * This option is mutually exclusive with {@link #signatureExpiration(Instant)}
          */
         Builder signatureDuration(Duration signatureDuration);
 
@@ -52,14 +52,11 @@ public abstract class PresignRequest {
             this.signatureDuration = request.signatureDuration;
         }
 
-        /**
-         * The duration for which this presigned request should be valid. After this time has
-         * expired, attempting to use the presigned request will fail.
-         */
         @Override
         public Builder signatureDuration(Duration signatureDuration) {
             this.signatureDuration = signatureDuration;
             return this;
         }
+
     }
 }

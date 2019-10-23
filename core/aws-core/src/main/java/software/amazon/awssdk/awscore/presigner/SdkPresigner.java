@@ -15,7 +15,7 @@
 
 package software.amazon.awssdk.awscore.presigner;
 
-import java.net.URL;
+import java.net.URI;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.utils.SdkAutoCloseable;
@@ -26,7 +26,7 @@ public interface SdkPresigner extends SdkAutoCloseable {
 
         Builder credentialsProvider(AwsCredentialsProvider credentialsProvider);
 
-        Builder endpointOverride(URL endpointOverride);
+        Builder endpointOverride(URI endpointOverride);
 
         SdkPresigner build();
     }
