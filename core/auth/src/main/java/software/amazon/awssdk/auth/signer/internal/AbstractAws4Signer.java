@@ -204,7 +204,7 @@ public abstract class AbstractAws4Signer<T extends Aws4SignerParams, U extends A
                                   SignerConstant.LINE_SEPARATOR +
                                   contentSha256;
 
-        LOG.trace(() -> "AWS4 Canonical Request: " + canonicalRequest);
+        LOG.debug(() -> "AWS4 Canonical Request: " + canonicalRequest);
         return canonicalRequest;
     }
 

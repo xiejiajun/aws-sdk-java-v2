@@ -83,7 +83,7 @@ public abstract class RdsPresignInterceptor<T extends RdsRequest> implements Exe
 
     @Override
     public final SdkHttpRequest modifyHttpRequest(Context.ModifyHttpRequest context,
-                                                      ExecutionAttributes executionAttributes) {
+                                                  ExecutionAttributes executionAttributes) {
         SdkHttpRequest request = context.httpRequest();
         SdkRequest originalRequest = context.request();
         if (!requestClassToPreSign.isInstance(originalRequest)) {
