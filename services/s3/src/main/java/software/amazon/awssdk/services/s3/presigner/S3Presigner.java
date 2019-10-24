@@ -245,8 +245,6 @@ public interface S3Presigner extends SdkPresigner {
      *                            "request from Java code.");
      * }
      * </pre>
-     * @param request
-     * @return
      */
     PresignedGetObjectRequest presignGetObject(GetObjectPresignRequest request);
 
@@ -271,29 +269,16 @@ public interface S3Presigner extends SdkPresigner {
     @SdkPublicApi
     @NotThreadSafe
     interface Builder extends SdkPresigner.Builder {
-        /**
-         * Configure the region that should be used for request signing.
-         * <p/>
-         * If this is not set, the {@link DefaultAwsRegionProviderChain} will be consulted to determine the region.
-         */
+        @Override
         Builder region(Region region);
 
-        /**
-         * Configure the credentials that should be used for request signing.
-         * <p/>
-         * If this is not set, the {@link DefaultCredentialsProvider} will be used.
-         */
+        @Override
         Builder credentialsProvider(AwsCredentialsProvider credentialsProvider);
 
-        /**
-         * Configure an endpoint that should be used in the pre-signed requests. This will override the endpoint that is usually
-         * determined by the {@link #region(Region)}.
-         */
+        @Override
         Builder endpointOverride(URI endpointOverride);
 
-        /**
-         * Build the presigner using the configuration on this builder.
-         */
+        @Override
         S3Presigner build();
     }
 }

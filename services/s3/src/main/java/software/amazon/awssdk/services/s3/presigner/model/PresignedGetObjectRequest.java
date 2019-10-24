@@ -27,9 +27,18 @@ import software.amazon.awssdk.annotations.ThreadSafe;
 import software.amazon.awssdk.awscore.presigner.PresignedRequest;
 import software.amazon.awssdk.core.SdkBytes;
 import software.amazon.awssdk.http.SdkHttpRequest;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.utils.builder.CopyableBuilder;
 import software.amazon.awssdk.utils.builder.ToCopyableBuilder;
 
+/**
+ * A pre-signed a {@link GetObjectRequest} that can be executed at a later time without requiring additional signing or
+ * authentication.
+ *
+ * @see S3Presigner#presignGetObject(GetObjectPresignRequest)
+ * @see #builder()
+ */
 @SdkPublicApi
 @Immutable
 @ThreadSafe
@@ -40,14 +49,23 @@ public class PresignedGetObjectRequest
         super(builder);
     }
 
+    /**
+     * Create a builder that can be used to create a {@link PresignedGetObjectRequest}.
+     *
+     * @see S3Presigner#presignGetObject(GetObjectPresignRequest)
+     */
     public static Builder builder() {
         return new DefaultBuilder();
     }
 
+    @Override
     public Builder toBuilder() {
         return new DefaultBuilder(this);
     }
 
+    /**
+     * A builder for a {@link PresignedGetObjectRequest}, created with {@link #builder()}.
+     */
     @SdkPublicApi
     @NotThreadSafe
     public interface Builder extends PresignedRequest.Builder,
@@ -76,48 +94,12 @@ public class PresignedGetObjectRequest
 
     @SdkInternalApi
     private static final class DefaultBuilder
-            extends PresignedRequest.DefaultBuilder
+            extends PresignedRequest.DefaultBuilder<DefaultBuilder>
             implements Builder {
         private DefaultBuilder() { }
 
         private DefaultBuilder(PresignedGetObjectRequest request) {
             super(request);
-        }
-
-        @Override
-        public Builder url(URL url) {
-            super.url(url);
-            return this;
-        }
-
-        @Override
-        public Builder expiration(Instant expiration) {
-            super.expiration(expiration);
-            return this;
-        }
-
-        @Override
-        public Builder isBrowserCompatible(Boolean isBrowserCompatible) {
-            super.isBrowserCompatible(isBrowserCompatible);
-            return this;
-        }
-
-        @Override
-        public Builder signedHeaders(Map<String, List<String>> signedHeaders) {
-            super.signedHeaders(signedHeaders);
-            return this;
-        }
-
-        @Override
-        public Builder signedPayload(SdkBytes signedPayload) {
-            super.signedPayload(signedPayload);
-            return this;
-        }
-
-        @Override
-        public Builder httpRequest(SdkHttpRequest httpRequest) {
-            super.httpRequest(httpRequest);
-            return this;
         }
 
         @Override

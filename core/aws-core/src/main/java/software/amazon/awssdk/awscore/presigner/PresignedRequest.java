@@ -1,3 +1,18 @@
+/*
+ * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License").
+ * You may not use this file except in compliance with the License.
+ * A copy of the License is located at
+ *
+ *  http://aws.amazon.com/apache2.0
+ *
+ * or in the "license" file accompanying this file. This file is distributed
+ * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+ * express or implied. See the License for the specific language governing
+ * permissions and limitations under the License.
+ */
+
 package software.amazon.awssdk.awscore.presigner;
 
 import java.net.URL;
@@ -5,14 +20,17 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import software.amazon.awssdk.annotations.SdkProtectedApi;
 import software.amazon.awssdk.annotations.SdkPublicApi;
 import software.amazon.awssdk.core.SdkBytes;
 import software.amazon.awssdk.http.SdkHttpRequest;
 import software.amazon.awssdk.utils.Validate;
 
+
 /**
- * A generic presigned request. The isBrowserCompatible method can be used to determine whether this request
- * can be executed by a web browser.
+ * The base class for all presigned requests.
+ * <p/>
+ * The {@link #isBrowserCompatible} method can be used to determine whether this request can be executed by a web browser.
  */
 @SdkPublicApi
 public abstract class PresignedRequest {
@@ -23,7 +41,7 @@ public abstract class PresignedRequest {
     private final Optional<SdkBytes> signedPayload;
     private final SdkHttpRequest httpRequest;
 
-    protected PresignedRequest(DefaultBuilder builder) {
+    protected PresignedRequest(DefaultBuilder<?> builder) {
         this.url = Validate.notNull(builder.url, "url");
         this.expiration = Validate.notNull(builder.expiration, "expiration");
         this.isBrowserCompatible = Validate.notNull(builder.isBrowserCompatible, "isBrowserCompatible");
@@ -33,7 +51,7 @@ public abstract class PresignedRequest {
     }
 
     /**
-     * The URL that the presigned request will execute against. The isBrowserCompatible method can be used to
+     * The URL that the presigned request will execute against. The {@link #isBrowserCompatible} method can be used to
      * determine whether this request will work in a browser.
      */
     public URL url() {
@@ -43,7 +61,7 @@ public abstract class PresignedRequest {
     /**
      * The exact SERVICE time that the request will expire. After this time, attempting to execute the request
      * will fail.
-     * <p>
+     * <p/>
      * This may differ from the local clock, based on the skew between the local and AWS service clocks.
      */
     public Instant expiration() {
@@ -51,11 +69,10 @@ public abstract class PresignedRequest {
     }
 
     /**
-     * Returns true if the url returned by the url method can be executed in a browser.
-     * <p>
-     * This is true when the HTTP request method is GET, and hasSignedHeaders and hasSignedPayload are false.
-     * <p>
-     * TODO: This isn't a universally-agreed-upon-good method name. We should iterate on it before GA.
+     * Whether the url returned by the url method can be executed in a browser.
+     * <p/>
+     * This is true when the HTTP request method is GET, and the request doesn't require any headers or payloads that wouldn't
+     * be sent by a browser.
      */
     public boolean isBrowserCompatible() {
         return isBrowserCompatible;
@@ -70,7 +87,7 @@ public abstract class PresignedRequest {
     }
 
     /**
-     * Returns the payload that was signed, or Optional.empty() if hasSignedPayload is false.
+     * Returns the payload that was signed, or Optional.empty() if there is no signed payload with this request.
      */
     public Optional<SdkBytes> signedPayload() {
         return signedPayload;
@@ -86,49 +103,46 @@ public abstract class PresignedRequest {
         return httpRequest;
     }
 
+    @SdkPublicApi
     public interface Builder {
         /**
-         * Specifies the URL that the presigned request will execute against. The isBrowserCompatible method can be used to
-         * determine whether this request will work in a browser.
+         * Configure the URL that the presigned request will execute against.
          */
         Builder url(URL url);
 
         /**
-         * The exact SERVICE time that the request will expire. After this time, attempting to execute the request
+         * Configure the exact SERVICE time that the request will expire. After this time, attempting to execute the request
          * will fail.
-         * <p>
-         * This may differ from the local clock, based on the skew between the local and AWS service clocks.
          */
         Builder expiration(Instant expiration);
 
         /**
-         * Whether the url returned by the url method can be executed in a browser.
+         * Configure whether the url returned by the url method can be executed in a browser.
          */
         Builder isBrowserCompatible(Boolean isBrowserCompatible);
 
         /**
-         * Returns the subset of headers that were signed, and MUST be included in the presigned request to prevent
+         * Configure the subset of headers that were signed, and MUST be included in the presigned request to prevent
          * the request from failing.
          */
         Builder signedHeaders(Map<String, List<String>> signedHeaders);
 
         /**
-         * Returns the payload that was signed, or Optional.empty() if hasSignedPayload is false.
+         * Configure the payload that was signed.
          */
         Builder signedPayload(SdkBytes signedPayload);
 
         /**
-         * The entire SigV4 query-parameter signed request (minus the payload), that can be transmitted as-is to a
+         * Configure the entire SigV4 query-parameter signed request (minus the payload), that can be transmitted as-is to a
          * service using any HTTP client that implement the SDK's HTTP client SPI.
-         * <p>
-         * This request includes signed AND unsigned headers.
          */
         Builder httpRequest(SdkHttpRequest httpRequest);
 
         PresignedRequest build();
     }
 
-    protected abstract static class DefaultBuilder implements Builder {
+    @SdkProtectedApi
+    protected abstract static class DefaultBuilder<B extends DefaultBuilder<B>> implements Builder {
         private URL url;
         private Instant expiration;
         private Boolean isBrowserCompatible;
@@ -148,39 +162,44 @@ public abstract class PresignedRequest {
         }
 
         @Override
-        public Builder url(URL url) {
+        public B url(URL url) {
             this.url = url;
-            return this;
+            return thisBuilder();
         }
 
         @Override
-        public Builder expiration(Instant expiration) {
+        public B expiration(Instant expiration) {
             this.expiration = expiration;
-            return this;
+            return thisBuilder();
         }
 
         @Override
-        public Builder isBrowserCompatible(Boolean isBrowserCompatible) {
+        public B isBrowserCompatible(Boolean isBrowserCompatible) {
             this.isBrowserCompatible = isBrowserCompatible;
-            return this;
+            return thisBuilder();
         }
 
         @Override
-        public Builder signedHeaders(Map<String, List<String>> signedHeaders) {
+        public B signedHeaders(Map<String, List<String>> signedHeaders) {
             this.signedHeaders = signedHeaders;
-            return this;
+            return thisBuilder();
         }
 
         @Override
-        public Builder signedPayload(SdkBytes signedPayload) {
+        public B signedPayload(SdkBytes signedPayload) {
             this.signedPayload = Optional.ofNullable(signedPayload);
-            return this;
+            return thisBuilder();
         }
 
         @Override
-        public Builder httpRequest(SdkHttpRequest httpRequest) {
+        public B httpRequest(SdkHttpRequest httpRequest) {
             this.httpRequest = httpRequest;
-            return this;
+            return thisBuilder();
+        }
+
+        @SuppressWarnings("unused")
+        protected B thisBuilder() {
+            return (B) this;
         }
     }
 }

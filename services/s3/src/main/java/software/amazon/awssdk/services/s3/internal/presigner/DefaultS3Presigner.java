@@ -27,6 +27,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.stream.Stream;
 import software.amazon.awssdk.annotations.SdkInternalApi;
 import software.amazon.awssdk.auth.credentials.AwsCredentials;
@@ -37,7 +38,6 @@ import software.amazon.awssdk.awscore.AwsExecutionAttribute;
 import software.amazon.awssdk.awscore.AwsRequestOverrideConfiguration;
 import software.amazon.awssdk.awscore.client.builder.AwsDefaultClientBuilder;
 import software.amazon.awssdk.awscore.endpoint.DefaultServiceEndpointBuilder;
-import software.amazon.awssdk.awscore.presigner.DefaultSdkPresigner;
 import software.amazon.awssdk.awscore.presigner.PresignRequest;
 import software.amazon.awssdk.awscore.presigner.PresignedRequest;
 import software.amazon.awssdk.core.ClientType;
@@ -58,22 +58,26 @@ import software.amazon.awssdk.core.interceptor.SdkInternalExecutionAttribute;
 import software.amazon.awssdk.core.signer.Presigner;
 import software.amazon.awssdk.core.signer.Signer;
 import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.http.ContentStreamProvider;
 import software.amazon.awssdk.http.SdkHttpFullRequest;
 import software.amazon.awssdk.http.SdkHttpMethod;
 import software.amazon.awssdk.http.SdkHttpRequest;
 import software.amazon.awssdk.protocols.xml.AwsS3ProtocolFactory;
-import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
 import software.amazon.awssdk.services.s3.transform.GetObjectRequestMarshaller;
+import software.amazon.awssdk.utils.IoUtils;
 import software.amazon.awssdk.utils.Validate;
 
+/**
+ * The default implementation of the {@link S3Presigner} interface.
+ */
 @SdkInternalApi
 public final class DefaultS3Presigner extends DefaultSdkPresigner implements S3Presigner {
-    private static final AwsS3V4Signer SIGNER = AwsS3V4Signer.create();
+    private static final AwsS3V4Signer DEFAULT_SIGNER = AwsS3V4Signer.create();
     private static final String SERVICE_NAME = "s3";
     private static final String SIGNING_NAME = "s3";
 
@@ -92,7 +96,6 @@ public final class DefaultS3Presigner extends DefaultSdkPresigner implements S3P
 
     /**
      * Copied from {@code DefaultS3BaseClientBuilder} and {@link SdkDefaultClientBuilder}.
-     * @return
      */
     private List<ExecutionInterceptor> initializeInterceptors() {
         ClasspathInterceptorChainFactory interceptorFactory = new ClasspathInterceptorChainFactory();
@@ -123,142 +126,83 @@ public final class DefaultS3Presigner extends DefaultSdkPresigner implements S3P
     }
 
     private URI resolveEndpoint() {
-        if (endpointOverride != null) {
-            return endpointOverride;
+        if (endpointOverride() != null) {
+            return endpointOverride();
         }
 
-        // TODO: Is this API actually protected? It's pretty gross.
         return new DefaultServiceEndpointBuilder(SERVICE_NAME, "https")
-            .withRegion(region)
+            .withRegion(region())
             .getServiceEndpoint();
     }
 
     @Override
     public PresignedGetObjectRequest presignGetObject(GetObjectPresignRequest request) {
-        return presign(PresignedGetObjectRequest.builder(), request, request.getObjectRequest(), "GetObject").build();
+        return presign(PresignedGetObjectRequest.builder(),
+                       request,
+                       request.getObjectRequest(),
+                       GetObjectRequest.class,
+                       getObjectRequestMarshaller::marshall,
+                       "GetObject")
+            .build();
     }
 
-    private <T extends PresignedRequest.Builder> T presign(T presignedRequest,
-                                                           PresignRequest presignRequest,
-                                                           SdkRequest requestToPresign,
-                                                           String operationName) {
+    /**
+     * Generate a {@link PresignedRequest} from a {@link PresignedRequest} and {@link SdkRequest}.
+     */
+    private <T extends PresignedRequest.Builder, U> T presign(T presignedRequest,
+                                                              PresignRequest presignRequest,
+                                                              SdkRequest requestToPresign,
+                                                              Class<U> requestToPresignType,
+                                                              Function<U, SdkHttpFullRequest> requestMarshaller,
+                                                              String operationName) {
         ExecutionContext execCtx = createExecutionContext(presignRequest, requestToPresign, operationName);
 
-        execCtx.interceptorChain().beforeExecution(execCtx.interceptorContext(), execCtx.executionAttributes());
-        execCtx.interceptorContext(execCtx.interceptorChain().modifyRequest(execCtx.interceptorContext(),
-                                                                            execCtx.executionAttributes()));
-        marshalRequestAndUpdateContext(execCtx);
-        execCtx.interceptorContext(execCtx.interceptorChain().modifyHttpRequestAndHttpContent(execCtx.interceptorContext(),
-                                                                                              execCtx.executionAttributes()));
+        callBeforeExecutionHooks(execCtx);
+        callModifyRequestHooksAndUpdateContext(execCtx);
+        callBeforeMarshallingHooks(execCtx);
+        marshalRequestAndUpdateContext(execCtx, requestToPresignType, requestMarshaller);
+        callAfterMarshallingHooks(execCtx);
+        addRequestLevelHeadersAndQueryParameters(execCtx);
+        callModifyHttpRequestHooksAndUpdateContext(execCtx);
 
-        SdkHttpFullRequest finalizedRequest = (SdkHttpFullRequest) execCtx.interceptorContext().httpRequest();
-        Optional<RequestBody> bodyFromInterceptor = execCtx.interceptorContext().requestBody();
-        if (bodyFromInterceptor.isPresent()) {
-            finalizedRequest = finalizedRequest.toBuilder()
-                                               .contentStreamProvider(bodyFromInterceptor.get().contentStreamProvider())
-                                               .build();
-        }
+        SdkHttpFullRequest httpRequest = getHttpFullRequest(execCtx);
+        SdkHttpFullRequest signedHttpRequest = presignRequest(execCtx, httpRequest);
 
-        Presigner presigner = Validate.isInstanceOf(Presigner.class, execCtx.signer(),
-                                                    "Configured signer (%s) does not support presigning (must implement %s).",
-                                                    execCtx.signer().getClass(), Presigner.class);
-
-        SdkHttpFullRequest signedHttpRequest = presigner.presign(finalizedRequest, execCtx.executionAttributes());
-
-        SdkBytes signedPayload = signedHttpRequest.contentStreamProvider()
-                                                  .map(p -> SdkBytes.fromInputStream(p.newStream()))
-                                                  .orElse(null);
-
-        // TODO: This only works with SigV4
-        List<String> signedHeadersQueryParam = signedHttpRequest.rawQueryParameters().get("X-Amz-SignedHeaders");
-        Validate.validState(signedHeadersQueryParam != null,
-                            "Only SigV4 presigning is supported at this time, but the configured "
-                            + "presigner (%s) did not generate a SigV4 signature.", presigner.getClass());
-        Map<String, List<String>> signedHeaders =
-            signedHeadersQueryParam.stream()
-                                   .flatMap(h -> Stream.of(h.split(";")))
-                                   .collect(toMap(h -> h, h -> signedHttpRequest.firstMatchingHeader(h)
-                                                                               .map(Collections::singletonList)
-                                                                               .orElseGet(ArrayList::new)));
-
-        boolean isBrowserCompatible = signedHttpRequest.method() == SdkHttpMethod.GET &&
-                                      signedPayload == null &&
-                                      (signedHeaders.isEmpty() ||
-                                       (signedHeaders.size() == 1 && signedHeaders.containsKey("host")));
-
-        presignedRequest.expiration(execCtx.executionAttributes().getAttribute(PRESIGNER_EXPIRATION))
-                        .url(invokeSafely(signedHttpRequest.getUri()::toURL))
-                        .isBrowserCompatible(isBrowserCompatible)
-                        .httpRequest(signedHttpRequest)
-                        .signedHeaders(signedHeaders)
-                        .signedPayload(signedPayload);
+        initializePresignedRequest(presignedRequest, execCtx, signedHttpRequest);
 
         return presignedRequest;
     }
 
-    private void marshalRequestAndUpdateContext(ExecutionContext execCtx) {
-        GetObjectRequest getObjectRequest = Validate.isInstanceOf(GetObjectRequest.class, execCtx.interceptorContext().request(),
-                                                                  "Interceptor modified request type from a GetObjectRequest.");
-
-        execCtx.interceptorChain().beforeMarshalling(execCtx.interceptorContext(), execCtx.executionAttributes());
-        SdkHttpFullRequest marshalledRequest = getObjectRequestMarshaller.marshall(getObjectRequest);
-        execCtx.interceptorChain().afterMarshalling(execCtx.interceptorContext(), execCtx.executionAttributes());
-
-        SdkHttpFullRequest marshalledRequestWithRequestOverrides =
-            marshalledRequest.toBuilder()
-                             .applyMutation(b -> addRequestHeaders(b, getObjectRequest))
-                             .applyMutation(b -> addRequestQueryParams(b,  getObjectRequest))
-                             .build();
-
-        execCtx.interceptorContext(execCtx.interceptorContext().copy(r -> r.httpRequest(marshalledRequestWithRequestOverrides)));
-    }
-
-    private void addRequestHeaders(SdkHttpRequest.Builder builder, GetObjectRequest request) {
-        request.overrideConfiguration().ifPresent(overrideConfig -> {
-            if (!overrideConfig.headers().isEmpty()) {
-                overrideConfig.headers().forEach(builder::putHeader);
-            }
-        });
-    }
-
-    private void addRequestQueryParams(SdkHttpRequest.Builder builder, GetObjectRequest request) {
-        request.overrideConfiguration().ifPresent(overrideConfig -> {
-            if (!overrideConfig.rawQueryParameters().isEmpty()) {
-                overrideConfig.rawQueryParameters().forEach(builder::putRawQueryParameter);
-            }
-        });
-    }
-
     /**
-     * Copied from {@code AwsClientHandlerUtils#createExecutionContext}.
+     * Creates an execution context from the provided requests information.
      */
     private ExecutionContext createExecutionContext(PresignRequest presignRequest, SdkRequest sdkRequest, String operationName) {
-        AwsCredentialsProvider clientCredentials = credentialsProvider;
+        AwsCredentialsProvider clientCredentials = credentialsProvider();
         AwsCredentialsProvider credentialsProvider = sdkRequest.overrideConfiguration()
                                                                .filter(c -> c instanceof AwsRequestOverrideConfiguration)
                                                                .map(c -> (AwsRequestOverrideConfiguration) c)
                                                                .flatMap(AwsRequestOverrideConfiguration::credentialsProvider)
                                                                .orElse(clientCredentials);
 
-        Signer signer = sdkRequest.overrideConfiguration().flatMap(RequestOverrideConfiguration::signer).orElse(SIGNER);
+        Signer signer = sdkRequest.overrideConfiguration().flatMap(RequestOverrideConfiguration::signer).orElse(DEFAULT_SIGNER);
         Instant signatureExpiration = Instant.now().plus(presignRequest.signatureDuration());
 
         AwsCredentials credentials = credentialsProvider.resolveCredentials();
         Validate.validState(credentials != null, "Credential providers must never return null.");
 
         ExecutionAttributes executionAttributes = new ExecutionAttributes()
-                .putAttribute(AwsSignerExecutionAttribute.AWS_CREDENTIALS, credentials)
-                .putAttribute(AwsSignerExecutionAttribute.SERVICE_SIGNING_NAME, SIGNING_NAME)
-                .putAttribute(AwsExecutionAttribute.AWS_REGION, region)
-                .putAttribute(AwsSignerExecutionAttribute.SIGNING_REGION, region)
-                .putAttribute(SdkInternalExecutionAttribute.IS_FULL_DUPLEX, false)
-                .putAttribute(SdkExecutionAttribute.CLIENT_TYPE, ClientType.SYNC)
-                .putAttribute(SdkExecutionAttribute.SERVICE_NAME, SERVICE_NAME)
-                .putAttribute(SdkExecutionAttribute.OPERATION_NAME, operationName)
-                .putAttribute(AwsSignerExecutionAttribute.SERVICE_CONFIG, S3Configuration.builder()
-                                                                                         .checksumValidationEnabled(false)
-                                                                                         .build())
-                .putAttribute(PRESIGNER_EXPIRATION, signatureExpiration);
+            .putAttribute(AwsSignerExecutionAttribute.AWS_CREDENTIALS, credentials)
+            .putAttribute(AwsSignerExecutionAttribute.SERVICE_SIGNING_NAME, SIGNING_NAME)
+            .putAttribute(AwsExecutionAttribute.AWS_REGION, region())
+            .putAttribute(AwsSignerExecutionAttribute.SIGNING_REGION, region())
+            .putAttribute(SdkInternalExecutionAttribute.IS_FULL_DUPLEX, false)
+            .putAttribute(SdkExecutionAttribute.CLIENT_TYPE, ClientType.SYNC)
+            .putAttribute(SdkExecutionAttribute.SERVICE_NAME, SERVICE_NAME)
+            .putAttribute(SdkExecutionAttribute.OPERATION_NAME, operationName)
+            .putAttribute(AwsSignerExecutionAttribute.SERVICE_CONFIG, S3Configuration.builder()
+                                                                                     .checksumValidationEnabled(false)
+                                                                                     .build())
+            .putAttribute(PRESIGNER_EXPIRATION, signatureExpiration);
 
         ExecutionInterceptorChain executionInterceptorChain = new ExecutionInterceptorChain(clientInterceptors);
         return ExecutionContext.builder()
@@ -271,30 +215,167 @@ public final class DefaultS3Presigner extends DefaultSdkPresigner implements S3P
                                .build();
     }
 
-    public static final class Builder extends DefaultSdkPresigner.Builder implements S3Presigner.Builder {
-        private Region region;
-        private AwsCredentialsProvider credentialsProvider;
-        private URI endpointOverride;
+    /**
+     * Call the before-execution interceptor hooks.
+     */
+    private void callBeforeExecutionHooks(ExecutionContext execCtx) {
+        execCtx.interceptorChain().beforeExecution(execCtx.interceptorContext(), execCtx.executionAttributes());
+    }
+
+    /**
+     * Call the modify-request interceptor hooks and update the execution context.
+     */
+    private void callModifyRequestHooksAndUpdateContext(ExecutionContext execCtx) {
+        execCtx.interceptorContext(execCtx.interceptorChain().modifyRequest(execCtx.interceptorContext(),
+                                                                            execCtx.executionAttributes()));
+    }
+
+    /**
+     * Call the before-marshalling interceptor hooks.
+     */
+    private void callBeforeMarshallingHooks(ExecutionContext execCtx) {
+        execCtx.interceptorChain().beforeMarshalling(execCtx.interceptorContext(), execCtx.executionAttributes());
+    }
+
+    /**
+     * Marshal the request and update the execution context with the result.
+     */
+    private <T> void marshalRequestAndUpdateContext(ExecutionContext execCtx,
+                                                    Class<T> requestType,
+                                                    Function<T, SdkHttpFullRequest> requestMarshaller) {
+        T sdkRequest = Validate.isInstanceOf(requestType, execCtx.interceptorContext().request(),
+                                             "Interceptor generated unsupported type (%s) when %s was expected.",
+                                             execCtx.interceptorContext().request().getClass(), requestType);
+
+        SdkHttpFullRequest marshalledRequest = requestMarshaller.apply(sdkRequest);
+
+        // TODO: The core SDK doesn't put the request body into the interceptor context. That should be fixed.
+        Optional<RequestBody> requestBody = marshalledRequest.contentStreamProvider()
+                                                             .map(ContentStreamProvider::newStream)
+                                                             .map(is -> invokeSafely(() -> IoUtils.toByteArray(is)))
+                                                             .map(RequestBody::fromBytes);
+
+        execCtx.interceptorContext(execCtx.interceptorContext().copy(r -> r.httpRequest(marshalledRequest)
+                                                                           .requestBody(requestBody.orElse(null))));
+    }
+
+    /**
+     * Call the after-marshalling interceptor hooks.
+     */
+    private void callAfterMarshallingHooks(ExecutionContext execCtx) {
+        execCtx.interceptorChain().afterMarshalling(execCtx.interceptorContext(), execCtx.executionAttributes());
+    }
+
+    /**
+     * Update the provided HTTP request by adding any HTTP headers or query parameters specified as part of the
+     * {@link SdkRequest}.
+     */
+    private void addRequestLevelHeadersAndQueryParameters(ExecutionContext execCtx) {
+        SdkHttpRequest httpRequest = execCtx.interceptorContext().httpRequest();
+        SdkRequest sdkRequest = execCtx.interceptorContext().request();
+        SdkHttpRequest updatedHttpRequest =
+            httpRequest.toBuilder()
+                       .applyMutation(b -> addRequestLevelHeaders(b, sdkRequest))
+                       .applyMutation(b -> addRequestLeveQueryParameters(b, sdkRequest))
+                       .build();
+        execCtx.interceptorContext(execCtx.interceptorContext().copy(c -> c.httpRequest(updatedHttpRequest)));
+    }
+
+    private void addRequestLevelHeaders(SdkHttpRequest.Builder builder, SdkRequest request) {
+        request.overrideConfiguration().ifPresent(overrideConfig -> {
+            if (!overrideConfig.headers().isEmpty()) {
+                overrideConfig.headers().forEach(builder::putHeader);
+            }
+        });
+    }
+
+    private void addRequestLeveQueryParameters(SdkHttpRequest.Builder builder, SdkRequest request) {
+        request.overrideConfiguration().ifPresent(overrideConfig -> {
+            if (!overrideConfig.rawQueryParameters().isEmpty()) {
+                overrideConfig.rawQueryParameters().forEach(builder::putRawQueryParameter);
+            }
+        });
+    }
+
+    /**
+     * Call the after-marshalling interceptor hooks and return the HTTP request that should be pre-signed.
+     */
+    private void callModifyHttpRequestHooksAndUpdateContext(ExecutionContext execCtx) {
+        execCtx.interceptorContext(execCtx.interceptorChain().modifyHttpRequestAndHttpContent(execCtx.interceptorContext(),
+                                                                                              execCtx.executionAttributes()));
+    }
+
+    /**
+     * Get the HTTP full request from the execution context.
+     */
+    private SdkHttpFullRequest getHttpFullRequest(ExecutionContext execCtx) {
+        SdkHttpRequest requestFromInterceptor = execCtx.interceptorContext().httpRequest();
+        Optional<RequestBody> bodyFromInterceptor = execCtx.interceptorContext().requestBody();
+
+        return SdkHttpFullRequest.builder()
+                                 .method(requestFromInterceptor.method())
+                                 .protocol(requestFromInterceptor.protocol())
+                                 .host(requestFromInterceptor.host())
+                                 .port(requestFromInterceptor.port())
+                                 .encodedPath(requestFromInterceptor.encodedPath())
+                                 .rawQueryParameters(requestFromInterceptor.rawQueryParameters())
+                                 .headers(requestFromInterceptor.headers())
+                                 .contentStreamProvider(bodyFromInterceptor.map(RequestBody::contentStreamProvider)
+                                                                           .orElse(null))
+                                 .build();
+    }
+
+    /**
+     * Presign the provided HTTP request.
+     */
+    private SdkHttpFullRequest presignRequest(ExecutionContext execCtx, SdkHttpFullRequest request) {
+        Presigner presigner = Validate.isInstanceOf(Presigner.class, execCtx.signer(),
+                                                    "Configured signer (%s) does not support presigning (must implement %s).",
+                                                    execCtx.signer().getClass(), Presigner.class);
+
+        return presigner.presign(request, execCtx.executionAttributes());
+    }
+
+    /**
+     * Initialize the provided presigned request.
+     */
+    private void initializePresignedRequest(PresignedRequest.Builder presignedRequest,
+                                            ExecutionContext execCtx,
+                                            SdkHttpFullRequest signedHttpRequest) {
+        SdkBytes signedPayload = signedHttpRequest.contentStreamProvider()
+                                                  .map(p -> SdkBytes.fromInputStream(p.newStream()))
+                                                  .orElse(null);
+
+        List<String> signedHeadersQueryParam = signedHttpRequest.rawQueryParameters().get("X-Amz-SignedHeaders");
+        Validate.validState(signedHeadersQueryParam != null,
+                            "Only SigV4 presigners are supported at this time, but the configured "
+                            + "presigner (%s) did not seem to generate a SigV4 signature.", execCtx.signer());
+
+        Map<String, List<String>> signedHeaders =
+            signedHeadersQueryParam.stream()
+                                   .flatMap(h -> Stream.of(h.split(";")))
+                                   .collect(toMap(h -> h, h -> signedHttpRequest.firstMatchingHeader(h)
+                                                                                .map(Collections::singletonList)
+                                                                                .orElseGet(ArrayList::new)));
+
+        boolean isBrowserCompatible = signedHttpRequest.method() == SdkHttpMethod.GET &&
+                                      signedPayload == null &&
+                                      (signedHeaders.isEmpty() ||
+                                       (signedHeaders.size() == 1 && signedHeaders.containsKey("host")));
+
+        presignedRequest.expiration(execCtx.executionAttributes().getAttribute(PRESIGNER_EXPIRATION))
+                        .url(invokeSafely(signedHttpRequest.getUri()::toURL))
+                        .isBrowserCompatible(isBrowserCompatible)
+                        .httpRequest(signedHttpRequest)
+                        .signedHeaders(signedHeaders)
+                        .signedPayload(signedPayload);
+    }
+
+    @SdkInternalApi
+    public static final class Builder extends DefaultSdkPresigner.Builder<Builder>
+        implements S3Presigner.Builder {
 
         private Builder() {}
-
-        @Override
-        public Builder region(Region region) {
-            super.region(region);
-            return this;
-        }
-
-        @Override
-        public Builder credentialsProvider(AwsCredentialsProvider credentialsProvider) {
-            super.credentialsProvider(credentialsProvider);
-            return this;
-        }
-
-        @Override
-        public Builder endpointOverride(URI endpointOverride) {
-            super.endpointOverride(endpointOverride);
-            return this;
-        }
 
         @Override
         public S3Presigner build() {

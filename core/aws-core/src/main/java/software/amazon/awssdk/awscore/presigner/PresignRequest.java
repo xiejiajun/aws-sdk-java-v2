@@ -12,38 +12,52 @@
  * express or implied. See the License for the specific language governing
  * permissions and limitations under the License.
  */
+
 package software.amazon.awssdk.awscore.presigner;
 
 import java.time.Duration;
-import java.time.Instant;
+import software.amazon.awssdk.annotations.SdkProtectedApi;
 import software.amazon.awssdk.annotations.SdkPublicApi;
 import software.amazon.awssdk.utils.Validate;
 
+/**
+ * The base class for all presign requests.
+ */
 @SdkPublicApi
 public abstract class PresignRequest {
     private final Duration signatureDuration;
 
-    protected PresignRequest(DefaultBuilder builder) {
+    protected PresignRequest(DefaultBuilder<?> builder) {
         this.signatureDuration = Validate.paramNotNull(builder.signatureDuration, "signatureDuration");
     }
 
+    /**
+     * Retrieves the duration for which this presigned request should be valid. After this time has
+     * expired, attempting to use the presigned request will fail. 
+     */
     public Duration signatureDuration() {
         return this.signatureDuration;
     }
 
+    /**
+     * The base interface for all presign request builders.
+     */
+    @SdkPublicApi
     public interface Builder {
         /**
          * Specifies the duration for which this presigned request should be valid. After this time has
          * expired, attempting to use the presigned request will fail. 
-         * <p>
-         * This option is mutually exclusive with {@link #signatureExpiration(Instant)}
          */
         Builder signatureDuration(Duration signatureDuration);
 
+        /**
+         * Build the presigned request, based on the configuration on this builder.
+         */
         PresignRequest build();
     }
 
-    protected abstract static class DefaultBuilder implements Builder {
+    @SdkProtectedApi
+    protected abstract static class DefaultBuilder<B extends DefaultBuilder<B>> implements Builder {
         private Duration signatureDuration;
 
         protected DefaultBuilder() {}
@@ -53,10 +67,14 @@ public abstract class PresignRequest {
         }
 
         @Override
-        public Builder signatureDuration(Duration signatureDuration) {
+        public B signatureDuration(Duration signatureDuration) {
             this.signatureDuration = signatureDuration;
-            return this;
+            return thisBuilder();
         }
 
+        @SuppressWarnings("unused")
+        protected B thisBuilder() {
+            return (B) this;
+        }
     }
 }

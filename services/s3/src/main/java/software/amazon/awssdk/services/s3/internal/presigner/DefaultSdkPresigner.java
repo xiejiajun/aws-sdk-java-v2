@@ -13,30 +13,53 @@
  * permissions and limitations under the License.
  */
 
-package software.amazon.awssdk.awscore.presigner;
+package software.amazon.awssdk.services.s3.internal.presigner;
 
 import java.net.URI;
 import software.amazon.awssdk.annotations.SdkInternalApi;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
+import software.amazon.awssdk.awscore.presigner.SdkPresigner;
 import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.regions.providers.AwsRegionProvider;
 import software.amazon.awssdk.regions.providers.DefaultAwsRegionProviderChain;
 import software.amazon.awssdk.regions.providers.LazyAwsRegionProvider;
 import software.amazon.awssdk.utils.IoUtils;
 
+/**
+ * The base class implementing the {@link SdkPresigner} interface.
+ * <p/>
+ * TODO: This should get moved to aws-core (or split and moved to sdk-core and aws-core) when we support presigning from
+ * multiple services.
+ * TODO: After moving, this should get marked as an @SdkProtectedApi.
+ */
 @SdkInternalApi
 public abstract class DefaultSdkPresigner implements SdkPresigner {
-    private static final LazyAwsRegionProvider DEFAULT_REGION_PROVIDER =
+    private static final AwsRegionProvider DEFAULT_REGION_PROVIDER =
             new LazyAwsRegionProvider(DefaultAwsRegionProviderChain::new);
+    private static final AwsCredentialsProvider DEFAULT_CREDENTIALS_PROVIDER =
+        DefaultCredentialsProvider.create();
 
-    protected final Region region;
-    protected final AwsCredentialsProvider credentialsProvider;
-    protected final URI endpointOverride;
+    private final Region region;
+    private final URI endpointOverride;
+    private final AwsCredentialsProvider credentialsProvider;
 
-    protected DefaultSdkPresigner(Builder b) {
+    protected DefaultSdkPresigner(Builder<?> b) {
         this.region = b.region != null ? b.region : DEFAULT_REGION_PROVIDER.getRegion();
-        this.credentialsProvider = b.credentialsProvider != null ? b.credentialsProvider : DefaultCredentialsProvider.create();
+        this.credentialsProvider = b.credentialsProvider != null ? b.credentialsProvider : DEFAULT_CREDENTIALS_PROVIDER;
         this.endpointOverride = b.endpointOverride;
+    }
+
+    protected Region region() {
+        return region;
+    }
+
+    protected AwsCredentialsProvider credentialsProvider() {
+        return credentialsProvider;
+    }
+
+    protected URI endpointOverride() {
+        return endpointOverride;
     }
 
     @Override
@@ -44,7 +67,12 @@ public abstract class DefaultSdkPresigner implements SdkPresigner {
         IoUtils.closeIfCloseable(credentialsProvider, null);
     }
 
-    public abstract static class Builder implements SdkPresigner.Builder {
+    /**
+     * The base class implementing the {@link SdkPresigner.Builder} interface.
+     */
+    @SdkInternalApi
+    public abstract static class Builder<B extends Builder<B>>
+        implements SdkPresigner.Builder {
         private Region region;
         private AwsCredentialsProvider credentialsProvider;
         private URI endpointOverride;
@@ -52,21 +80,26 @@ public abstract class DefaultSdkPresigner implements SdkPresigner {
         protected Builder() {}
 
         @Override
-        public Builder region(Region region) {
+        public B region(Region region) {
             this.region = region;
-            return this;
+            return thisBuilder();
         }
 
         @Override
-        public Builder credentialsProvider(AwsCredentialsProvider credentialsProvider) {
+        public B credentialsProvider(AwsCredentialsProvider credentialsProvider) {
             this.credentialsProvider = credentialsProvider;
-            return this;
+            return thisBuilder();
         }
 
         @Override
-        public Builder endpointOverride(URI endpointOverride) {
+        public B endpointOverride(URI endpointOverride) {
             this.endpointOverride = endpointOverride;
-            return this;
+            return thisBuilder();
+        }
+
+        @SuppressWarnings("unused")
+        private B thisBuilder() {
+            return (B) this;
         }
     }
 }
