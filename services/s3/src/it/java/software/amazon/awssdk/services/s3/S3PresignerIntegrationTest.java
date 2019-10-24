@@ -4,12 +4,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.time.Duration;
 import java.util.UUID;
+import java.util.function.Function;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import software.amazon.awssdk.core.BytesWrapper;
+import software.amazon.awssdk.core.SdkBytes;
+import software.amazon.awssdk.http.ContentStreamProvider;
 import software.amazon.awssdk.http.HttpExecuteRequest;
 import software.amazon.awssdk.http.HttpExecuteResponse;
 import software.amazon.awssdk.http.SdkHttpClient;
@@ -106,17 +111,15 @@ public class S3PresignerIntegrationTest {
         assertThat(presigned.isBrowserCompatible()).isFalse();
 
         HttpURLConnection connection = (HttpURLConnection) presigned.url().openConnection();
-        presigned.signedHeaders().forEach((h, vs) -> {
-            vs.forEach(v -> {
-                connection.addRequestProperty(h, v);
+
+        presigned.httpRequest().headers().forEach((header, values) -> {
+            values.forEach(value -> {
+                connection.addRequestProperty(header, value);
             });
         });
 
-        connection.connect();
-        try (InputStream content = connection.getInputStream()){
+        try (InputStream content = connection.getInputStream()) {
             assertThat(IoUtils.toUtf8String(content)).isEqualTo(testObjectContent);
-        } finally {
-            connection.disconnect();
         }
     }
 
@@ -130,11 +133,18 @@ public class S3PresignerIntegrationTest {
 
         assertThat(presigned.isBrowserCompatible()).isFalse();
 
-        SdkHttpClient httpClient = ApacheHttpClient.builder().build();
-        HttpExecuteResponse response = httpClient.prepareRequest(HttpExecuteRequest.builder()
-                                                                                   .request(presigned.httpRequest())
-                                                                                   .build())
-                                                 .call();
+        SdkHttpClient httpClient = ApacheHttpClient.builder().build(); // or UrlConnectionHttpClient.builder().build()
+
+        ContentStreamProvider requestPayload = presigned.signedPayload()
+                                                        .map(SdkBytes::asContentStreamProvider)
+                                                        .orElse(null);
+
+        HttpExecuteRequest request = HttpExecuteRequest.builder()
+                                                       .request(presigned.httpRequest())
+                                                       .contentStreamProvider(requestPayload)
+                                                       .build();
+
+        HttpExecuteResponse response = httpClient.prepareRequest(request).call();
 
         assertThat(response.responseBody()).isPresent();
         try (InputStream responseStream = response.responseBody().get()) {
