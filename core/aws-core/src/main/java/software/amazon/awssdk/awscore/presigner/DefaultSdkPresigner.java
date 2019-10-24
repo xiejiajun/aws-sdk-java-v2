@@ -16,9 +16,7 @@
 package software.amazon.awssdk.awscore.presigner;
 
 import java.net.URI;
-import java.net.URL;
 import software.amazon.awssdk.annotations.SdkInternalApi;
-import software.amazon.awssdk.annotations.SdkProtectedApi;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
