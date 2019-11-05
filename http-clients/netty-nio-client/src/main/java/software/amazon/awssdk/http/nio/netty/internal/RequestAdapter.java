@@ -22,7 +22,6 @@ import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http2.HttpConversionUtil.ExtensionHeaderNames;
-import java.net.URI;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
@@ -30,27 +29,19 @@ import software.amazon.awssdk.annotations.SdkInternalApi;
 import software.amazon.awssdk.http.Protocol;
 import software.amazon.awssdk.http.SdkHttpMethod;
 import software.amazon.awssdk.http.SdkHttpRequest;
-import software.amazon.awssdk.http.nio.netty.internal.utils.UriUtils;
 import software.amazon.awssdk.utils.StringUtils;
 import software.amazon.awssdk.utils.http.SdkHttpUtils;
 
 @SdkInternalApi
 public final class RequestAdapter {
 
-    private static final String HOST = "Host"; // can't use netty's because of case
+    private static final String HOST = "Host";
     private static final List<String> IGNORE_HEADERS = Arrays.asList(HOST);
-
-    private final Protocol protocol;
-
-    public RequestAdapter(Protocol protocol) {
-        Objects.requireNonNull(protocol, "protocol");
-        this.protocol = protocol;
-    }
 
     public HttpRequest adapt(SdkHttpRequest sdkRequest) {
         HttpMethod method = toNettyHttpMethod(sdkRequest.method());
         HttpHeaders headers = new DefaultHttpHeaders();
-        String uri = encodedPathAndQuery(sdkRequest);
+        String uri = encodedPathAndQueryParams(sdkRequest);
         DefaultHttpRequest request = new DefaultHttpRequest(HttpVersion.HTTP_1_1, method, uri, headers);
         addHeadersToRequest(request, sdkRequest);
         return request;
@@ -60,11 +51,12 @@ public final class RequestAdapter {
         return HttpMethod.valueOf(method.name());
     }
 
-    private static String encodedPathAndQuery(SdkHttpRequest sdkRequest) {
+    private static String encodedPathAndQueryParams(SdkHttpRequest sdkRequest) {
         String encodedPath = sdkRequest.encodedPath();
         if (StringUtils.isBlank(encodedPath)) {
             encodedPath = "/";
         }
+
         String encodedQueryParams = SdkHttpUtils.encodeAndFlattenQueryParameters(sdkRequest.rawQueryParameters())
                 .map(queryParams -> "?" + queryParams)
                 .orElse("");
@@ -75,11 +67,7 @@ public final class RequestAdapter {
      * Configures the headers in the specified Netty HTTP request.
      */
     private void addHeadersToRequest(DefaultHttpRequest httpRequest, SdkHttpRequest request) {
-        String scheme = request.protocol();
         httpRequest.headers().add(HOST, getHostHeaderValue(request));
-        if (protocol == Protocol.HTTP2 && !StringUtils.isBlank(scheme)) {
-            httpRequest.headers().add(ExtensionHeaderNames.SCHEME.text(), scheme);
-        }
 
         // Copy over any other headers already in our request
         request.headers().entrySet().stream()

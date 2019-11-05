@@ -26,6 +26,7 @@ import io.netty.handler.codec.http.FullHttpMessage;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpMessage;
+import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.codec.http2.DefaultHttp2DataFrame;
 import io.netty.handler.codec.http2.DefaultHttp2HeadersFrame;
@@ -37,6 +38,7 @@ import io.netty.handler.codec.http2.HttpToHttp2ConnectionHandler;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.EventExecutor;
 import software.amazon.awssdk.annotations.SdkInternalApi;
+import software.amazon.awssdk.utils.StringUtils;
 
 /**
  * Translates HTTP/1.1 Netty objects to the corresponding HTTP/2 frame objects. Much of this was lifted from
@@ -45,8 +47,10 @@ import software.amazon.awssdk.annotations.SdkInternalApi;
  */
 @SdkInternalApi
 public class HttpToHttp2OutboundAdapter extends ChannelOutboundHandlerAdapter {
+    private final String scheme;
 
-    public HttpToHttp2OutboundAdapter() {
+    public HttpToHttp2OutboundAdapter(String scheme) {
+        this.scheme = scheme;
     }
 
     /**
@@ -65,8 +69,13 @@ public class HttpToHttp2OutboundAdapter extends ChannelOutboundHandlerAdapter {
             new SimpleChannelPromiseAggregator(promise, ctx.channel(), ctx.executor());
         try {
             boolean endStream = false;
+
             if (msg instanceof HttpMessage) {
                 HttpMessage httpMsg = (HttpMessage) msg;
+
+                if (msg instanceof HttpRequest && !StringUtils.isBlank(scheme)) {
+                    ((HttpRequest) msg).headers().add(HttpConversionUtil.ExtensionHeaderNames.SCHEME.text(), scheme);
+                }
 
                 // Convert and write the headers.
                 Http2Headers http2Headers = HttpConversionUtil.toHttp2Headers(httpMsg, false);
