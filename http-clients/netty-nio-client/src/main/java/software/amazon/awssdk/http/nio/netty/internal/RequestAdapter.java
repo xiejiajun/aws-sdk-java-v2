@@ -50,10 +50,9 @@ public final class RequestAdapter {
     public HttpRequest adapt(SdkHttpRequest sdkRequest) {
         HttpMethod method = toNettyHttpMethod(sdkRequest.method());
         HttpHeaders headers = new DefaultHttpHeaders();
-        URI originalUri = sdkRequest.getUri();
-        String uri = UriUtils.relativize(originalUri).toString();
+        String uri = encodedPathAndQuery(sdkRequest);
         DefaultHttpRequest request = new DefaultHttpRequest(HttpVersion.HTTP_1_1, method, uri, headers);
-        addHeadersToRequest(request, sdkRequest, originalUri);
+        addHeadersToRequest(request, sdkRequest);
         return request;
     }
 
@@ -61,14 +60,25 @@ public final class RequestAdapter {
         return HttpMethod.valueOf(method.name());
     }
 
+    private static String encodedPathAndQuery(SdkHttpRequest sdkRequest) {
+        String encodedPath = sdkRequest.encodedPath();
+        if (StringUtils.isBlank(encodedPath)) {
+            encodedPath = "/";
+        }
+        String encodedQueryParams = SdkHttpUtils.encodeAndFlattenQueryParameters(sdkRequest.rawQueryParameters())
+                .map(queryParams -> "?" + queryParams)
+                .orElse("");
+
+        return encodedPath + encodedQueryParams;
+    }
     /**
      * Configures the headers in the specified Netty HTTP request.
      */
-    private void addHeadersToRequest(DefaultHttpRequest httpRequest, SdkHttpRequest request, URI originalUri) {
-
+    private void addHeadersToRequest(DefaultHttpRequest httpRequest, SdkHttpRequest request) {
+        String scheme = request.protocol();
         httpRequest.headers().add(HOST, getHostHeaderValue(request));
-        if (protocol == Protocol.HTTP2 && !StringUtils.isBlank(originalUri.getScheme())) {
-            httpRequest.headers().add(ExtensionHeaderNames.SCHEME.text(), originalUri.getScheme());
+        if (protocol == Protocol.HTTP2 && !StringUtils.isBlank(scheme)) {
+            httpRequest.headers().add(ExtensionHeaderNames.SCHEME.text(), scheme);
         }
 
         // Copy over any other headers already in our request
