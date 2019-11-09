@@ -135,11 +135,6 @@
             <version>${awsjavasdk.version}</version>
         </dependency>
         <dependency>
-            <groupId>io.netty</groupId>
-            <artifactId>netty-tcnative-boringssl-static</artifactId>
-            <scope>compile</scope>
-        </dependency>
-        <dependency>
             <groupId>software.amazon.awssdk</groupId>
             <artifactId>regions</artifactId>
             <version>${awsjavasdk.version}</version>
