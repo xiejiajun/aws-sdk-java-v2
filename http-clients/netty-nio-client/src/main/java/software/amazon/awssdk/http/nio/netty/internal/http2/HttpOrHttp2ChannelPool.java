@@ -15,7 +15,6 @@
 
 package software.amazon.awssdk.http.nio.netty.internal.http2;
 
-import static software.amazon.awssdk.http.nio.netty.internal.ChannelAttributeKey.MAX_CONCURRENT_STREAMS;
 import static software.amazon.awssdk.http.nio.netty.internal.ChannelAttributeKey.PROTOCOL_FUTURE;
 import static software.amazon.awssdk.http.nio.netty.internal.utils.NettyUtils.doInEventLoop;
 
@@ -149,8 +148,7 @@ public class HttpOrHttp2ChannelPool implements ChannelPool {
                                                  .maxPendingAcquires(configuration.maxPendingConnectionAcquires())
                                                  .build();
         } else {
-            ChannelPool h2Pool = new Http2MultiplexedChannelPool(
-                    delegatePool, eventLoop, newChannel.attr(MAX_CONCURRENT_STREAMS).get());
+            ChannelPool h2Pool = new Http2MultiplexedChannelPool(delegatePool, eventLoop);
             protocolImpl = BetterFixedChannelPool.builder()
                                                  .channelPool(h2Pool)
                                                  .executor(eventLoop)

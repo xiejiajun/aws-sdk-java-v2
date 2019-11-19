@@ -15,6 +15,7 @@
 
 package software.amazon.awssdk.http.nio.netty.internal.utils;
 
+import io.netty.channel.EventLoop;
 import io.netty.util.concurrent.EventExecutor;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
@@ -24,14 +25,16 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 import software.amazon.awssdk.annotations.SdkInternalApi;
+import software.amazon.awssdk.utils.Logger;
 
 @SdkInternalApi
 public final class NettyUtils {
-
     /**
      * Completed succeed future.
      */
     public static final SucceededFuture<?> SUCCEEDED_FUTURE = new SucceededFuture<>(null, null);
+
+    private static final Logger log = Logger.loggerFor(NettyUtils.class);
 
     private NettyUtils() {
     }
@@ -132,9 +135,29 @@ public final class NettyUtils {
      */
     public static void doInEventLoop(EventExecutor eventExecutor, Runnable runnable, Promise<?> promise) {
         try {
-            doInEventLoop(eventExecutor, runnable);
+            if (eventExecutor.inEventLoop()) {
+                runnable.run();
+            } else {
+                eventExecutor.submit(() -> {
+                    try {
+                        runnable.run();
+                    } catch (Exception e) {
+                        promise.setFailure(e);
+                    }
+                });
+            }
         } catch (Exception e) {
             promise.setFailure(e);
+        }
+    }
+
+    public static void warnIfNotInEventLoop(EventLoop loop) {
+        assert loop.inEventLoop();
+        if (!loop.inEventLoop()) {
+            Exception exception =
+                new IllegalStateException("Execution is not in the expected event loop. Please report this issue to the "
+                                          + "AWS SDK for Java team on GitHub, because it could result in race conditions.");
+            log.warn(() -> "Execution is happening outside of the expected event loop.", exception);
         }
     }
 }

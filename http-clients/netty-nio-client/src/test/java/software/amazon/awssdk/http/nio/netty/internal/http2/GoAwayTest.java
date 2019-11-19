@@ -13,9 +13,10 @@
  * permissions and limitations under the License.
  */
 
-package software.amazon.awssdk.http.nio.netty.fault;
+package software.amazon.awssdk.http.nio.netty.internal.http2;
 
 import static org.assertj.core.api.Assertions.assertThat;
+
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
@@ -36,8 +37,11 @@ import io.netty.handler.codec.http2.Http2FrameReader;
 import io.netty.handler.codec.http2.Http2FrameWriter;
 import io.netty.handler.codec.http2.Http2Headers;
 import io.netty.handler.codec.http2.Http2Settings;
+import io.netty.handler.logging.LogLevel;
+import io.netty.handler.logging.LoggingHandler;
 import io.netty.util.AttributeKey;
 import io.reactivex.Flowable;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -47,6 +51,10 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 import org.junit.After;
 import org.junit.Test;
@@ -61,6 +69,7 @@ import software.amazon.awssdk.http.async.SdkAsyncHttpResponseHandler;
 import software.amazon.awssdk.http.nio.netty.EmptyPublisher;
 import software.amazon.awssdk.http.nio.netty.NettyNioAsyncHttpClient;
 import software.amazon.awssdk.http.nio.netty.SdkEventLoopGroup;
+import software.amazon.awssdk.utils.Logger;
 
 /**
  * Tests to ensure that the client behaves as expected when it receives GOAWAY messages.
@@ -84,12 +93,60 @@ public class GoAwayTest {
     }
 
     @Test
+    public void goAwayCanCloseAllStreams() throws InterruptedException {
+        Set<String> serverChannels = ConcurrentHashMap.newKeySet();
+
+        CountDownLatch allRequestsReceived = new CountDownLatch(2);
+        Supplier<Http2FrameListener> frameListenerSupplier = () -> new TestFrameListener() {
+            @Override
+            public void onHeadersRead(ChannelHandlerContext ctx, int streamId, Http2Headers headers, int streamDependency, short weight, boolean exclusive, int padding, boolean endStream) {
+                serverChannels.add(ctx.channel().id().asShortText());
+
+                Http2Headers outboundHeaders = new DefaultHttp2Headers()
+                    .status("200")
+                    .add("content-type", "text/plain")
+                    .addInt("content-length", 5);
+
+                frameWriter().writeHeaders(ctx, streamId, outboundHeaders, 0, false, ctx.newPromise());
+                ctx.flush();
+
+                allRequestsReceived.countDown();
+            }
+        };
+
+        endpointDriver = new SimpleEndpointDriver(frameListenerSupplier);
+        endpointDriver.init();
+
+        netty = NettyNioAsyncHttpClient.builder()
+                                       .protocol(Protocol.HTTP2)
+                                       .build();
+
+        CompletableFuture<Void> request1 = sendGetRequest();
+        CompletableFuture<Void> request2 = sendGetRequest();
+
+        allRequestsReceived.await();
+
+        endpointDriver.channelsAdded.forEach(ch -> {
+            if (serverChannels.contains(ch.id().asShortText())) {
+                endpointDriver.goAway(ch, 0);
+            }
+        });
+
+        waitForFuture(request1);
+        waitForFuture(request2);
+
+        assertThat(request1.isCompletedExceptionally()).isTrue();
+        assertThat(request2.isCompletedExceptionally()).isTrue();
+        assertThat(endpointDriver.currentConnectionCount.get()).isEqualTo(0);
+    }
+
+    @Test
     public void execute_goAwayReceived_existingChannelsNotReused() throws InterruptedException {
         // Frame listener supplier for each connection
         Supplier<Http2FrameListener> frameListenerSupplier = () -> new TestFrameListener() {
             @Override
             public void onHeadersRead(ChannelHandlerContext ctx, int streamId, Http2Headers headers, int streamDependency, short weight, boolean exclusive, int padding, boolean endStream) {
-                frameWriter().writeHeaders(ctx, streamId, new DefaultHttp2Headers().add("content-length", "0").status("204"), 0, true, ctx.newPromise());
+                frameWriter().writeHeaders(ctx, streamId, new DefaultHttp2Headers().add("content-length", "10").status("204"), 0, false, ctx.newPromise());
                 ctx.flush();
             }
         };
@@ -105,10 +162,10 @@ public class GoAwayTest {
         sendGetRequest().join();
 
         // Note: It's possible the initial request can cause the client to allocate more than 1 channel
-        int initialChannelNum = endpointDriver.channels.size();
+        int initialChannelNum = endpointDriver.channelsAdded.size();
 
         // Send GOAWAY to all the currently open channels
-        endpointDriver.channels.forEach(ch -> endpointDriver.goAway(ch, 1));
+        endpointDriver.channelsAdded.forEach(ch -> endpointDriver.goAway(ch, 1));
 
         // Need to give a chance for the streams to get closed
         Thread.sleep(1000);
@@ -116,7 +173,7 @@ public class GoAwayTest {
         // Since the existing channels are now invalid, this request should cause a new channel to be opened
         sendGetRequest().join();
 
-        assertThat(endpointDriver.channels).hasSize(initialChannelNum + 1);
+        assertThat(endpointDriver.channelsAdded).hasSize(initialChannelNum + 1);
     }
 
     // The client should not close streams that are less than the 'last stream
@@ -165,10 +222,10 @@ public class GoAwayTest {
 
         CompletableFuture<Void> stream5Cf = sendGetRequest();// stream ID 5
 
-        allRequestsReceived.await();
+        allRequestsReceived.await(10, TimeUnit.SECONDS);
 
         // send the GOAWAY first, specifying that everything after 3 is not processed
-        endpointDriver.channels.forEach(ch -> {
+        endpointDriver.channelsAdded.forEach(ch -> {
             Set<Integer> streams = channelToStreams.getOrDefault(ch.id().asShortText(), Collections.emptySet());
             if (streams.contains(3)) {
                 endpointDriver.goAway(ch, 3);
@@ -176,7 +233,7 @@ public class GoAwayTest {
         });
 
         // now send the DATA for stream 3, which should still be valid
-        endpointDriver.channels.forEach(ch -> {
+        endpointDriver.channelsAdded.forEach(ch -> {
             Set<Integer> streams = channelToStreams.getOrDefault(ch.id().asShortText(), Collections.emptySet());
             if (streams.contains(3)) {
                 endpointDriver.data(ch, 3, getPayload);
@@ -188,11 +245,16 @@ public class GoAwayTest {
 
         assertThat(stream3Cf.isCompletedExceptionally()).isFalse();
         assertThat(stream5Cf.isCompletedExceptionally()).isTrue();
+        stream5Cf.exceptionally(e -> {
+            assertThat(e).isInstanceOf(IOException.class);
+            return null;
+        });
     }
 
     private CompletableFuture<Void> sendGetRequest() {
         AsyncExecuteRequest req = AsyncExecuteRequest.builder()
                 .responseHandler(new SdkAsyncHttpResponseHandler() {
+                    private final Logger log = Logger.loggerFor(GoAwayTest.class);
                     private SdkHttpResponse headers;
 
                     @Override
@@ -203,7 +265,8 @@ public class GoAwayTest {
                     @Override
                     public void onStream(Publisher<ByteBuffer> stream) {
                         // Consume the stream in order to complete request
-                        Flowable.fromPublisher(stream).forEach(b -> {});
+                        Flowable.fromPublisher(stream)
+                                .subscribe(b -> {}, t -> {});
                     }
 
                     @Override
@@ -224,19 +287,22 @@ public class GoAwayTest {
 
     private static void waitForFuture(CompletableFuture<?> cf) {
         try {
-            cf.join();
-        } catch (Throwable t) {
-            t.printStackTrace();
+            cf.get(2, TimeUnit.SECONDS);
+        } catch (ExecutionException | InterruptedException t) {
+        } catch (TimeoutException t) {
+            throw new RuntimeException("Future did not complete after 2 seconds.", t);
         }
     }
 
     // Minimal class to simulate an H2 endpoint
     private static class SimpleEndpointDriver extends ChannelInitializer<SocketChannel> {
-        private List<SocketChannel> channels = new ArrayList<>();
+        private List<Http2ConnHandler> handlers = new ArrayList<>();
+        private List<SocketChannel> channelsAdded = new ArrayList<>();
         private final NioEventLoopGroup group = new NioEventLoopGroup();
         private final Supplier<Http2FrameListener> frameListenerSupplier;
         private ServerBootstrap bootstrap;
         private ServerSocketChannel serverSock;
+        private AtomicInteger currentConnectionCount = new AtomicInteger(0);
 
         public SimpleEndpointDriver(Supplier<Http2FrameListener> frameListenerSupplier) {
             this.frameListenerSupplier = frameListenerSupplier;
@@ -293,8 +359,22 @@ public class GoAwayTest {
 
         @Override
         protected void initChannel(SocketChannel ch) throws Exception {
-            channels.add(ch);
-            ch.pipeline().addLast(new Http2ConnHandler(this, frameListenerSupplier.get()));
+            channelsAdded.add(ch);
+            Http2ConnHandler handler = new Http2ConnHandler(this, frameListenerSupplier.get());
+            handlers.add(handler);
+            ch.pipeline().addLast(handler);
+        }
+
+        @Override
+        public void channelActive(ChannelHandlerContext ctx) throws Exception {
+            currentConnectionCount.incrementAndGet();
+            super.channelActive(ctx);
+        }
+
+        @Override
+        public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+            currentConnectionCount.decrementAndGet();
+            super.channelInactive(ctx);
         }
     }
 
@@ -321,6 +401,7 @@ public class GoAwayTest {
         private final Http2FrameReader frameReader = new DefaultHttp2FrameReader();
         private final SimpleEndpointDriver simpleEndpointDriver;
         private final Http2FrameListener frameListener;
+        private volatile boolean closed = false;
 
         public Http2ConnHandler(SimpleEndpointDriver simpleEndpointDriver, Http2FrameListener frameListener) {
             this.simpleEndpointDriver = simpleEndpointDriver;
