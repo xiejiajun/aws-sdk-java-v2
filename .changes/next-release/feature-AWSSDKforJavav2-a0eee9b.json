@@ -1,0 +1,5 @@
+{
+    "category": "AWS SDK for Java v2", 
+    "type": "feature", 
+    "description": "Slight latency improvement when retrieving or releasing an HTTP/2 stream."
+}
