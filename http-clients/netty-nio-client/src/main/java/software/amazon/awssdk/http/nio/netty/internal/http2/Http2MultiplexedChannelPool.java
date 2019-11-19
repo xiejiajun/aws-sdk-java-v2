@@ -15,22 +15,25 @@
 
 package software.amazon.awssdk.http.nio.netty.internal.http2;
 
-import static software.amazon.awssdk.http.nio.netty.internal.ChannelAttributeKey.CHANNEL_POOL_RECORD;
 import static software.amazon.awssdk.http.nio.netty.internal.utils.NettyUtils.doInEventLoop;
 
 import io.netty.channel.Channel;
 import io.netty.channel.EventLoop;
 import io.netty.channel.pool.ChannelPool;
+import io.netty.handler.codec.http2.Http2GoAwayFrame;
 import io.netty.handler.codec.http2.Http2StreamChannelBootstrap;
+import io.netty.util.AttributeKey;
 import io.netty.util.concurrent.DefaultPromise;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.Promise;
 import java.util.ArrayList;
 import java.util.Collection;
-
 import software.amazon.awssdk.annotations.SdkInternalApi;
 import software.amazon.awssdk.annotations.SdkTestInternalApi;
+import software.amazon.awssdk.http.nio.netty.internal.ChannelAttributeKey;
 import software.amazon.awssdk.http.nio.netty.internal.utils.BetterFixedChannelPool;
+import software.amazon.awssdk.http.nio.netty.internal.utils.NettyUtils;
+import software.amazon.awssdk.utils.Logger;
 
 /**
  * {@link ChannelPool} implementation that handles multiplexed streams. Child channels are created
@@ -46,7 +49,13 @@ import software.amazon.awssdk.http.nio.netty.internal.utils.BetterFixedChannelPo
  */
 @SdkInternalApi
 public class Http2MultiplexedChannelPool implements ChannelPool {
+    /**
+     * Reference to the {@link MultiplexedChannelRecord} on a channel.
+     */
+    public static final AttributeKey<MultiplexedChannelRecord> CHANNEL_POOL_RECORD = AttributeKey.newInstance(
+        "aws.http.nio.netty.async.channelPoolRecord");
 
+    private static final Logger log = Logger.loggerFor(Http2MultiplexedChannelPool.class);
     private final EventLoop eventLoop;
     private final ChannelPool connectionPool;
     private final long maxConcurrencyPerConnection;
@@ -91,23 +100,116 @@ public class Http2MultiplexedChannelPool implements ChannelPool {
         return promise;
     }
 
+    public Future<?> handleConnectionLevelError(Channel channel, Throwable t) {
+        return handleConnectionLevelError(channel, t, new DefaultPromise<>(eventLoop));
+    }
+
+    public Future<?> handleConnectionLevelError(Channel channel, Throwable t, Promise<?> promise) {
+        doInEventLoop(eventLoop, () -> handleConnectionLevelError0(channel, t, promise));
+        return promise;
+    }
+
+    private Future<?> handleConnectionLevelError0(Channel channel, Throwable t, Promise<?> promise) {
+        try {
+            MultiplexedChannelRecord channelPoolRecord = channel.attr(CHANNEL_POOL_RECORD).get();
+
+            if (channelPoolRecord != null) {
+                channelPoolRecord.shutdownChildChannels(t);
+                releaseParentChannel()
+            } else {
+                log.error(() -> "Received connection-level error on a channel (" + channel.id() + ") that is not managed by "
+                                + "this type of channel pool. The channel and its parents will be shut down, to prevent "
+                                + "connection leaks.");
+                killChannelAndParents(channel);
+            }
+        } catch (Exception e) {
+            promise.setFailure(e);
+        }
+
+        promise.setSuccess(null);
+        return promise;
+    }
+
+    public Future<?> handleGoAway(Channel channel, Http2GoAwayFrame frame) {
+        return handleGoAway(channel, frame, new DefaultPromise<>(eventLoop));
+    }
+
+    public Future<?> handleGoAway(Channel channel, Http2GoAwayFrame frame, Promise<?> promise) {
+        doInEventLoop(eventLoop, () -> handleGoAway0(channel, frame, promise));
+        return promise;
+    }
+
+    private Future<?> handleGoAway0(Channel channel, Http2GoAwayFrame frame, Promise<?> promise) {
+        try {
+            MultiplexedChannelRecord channelPoolRecord = channel.attr(CHANNEL_POOL_RECORD).get();
+
+            if (channelPoolRecord != null) {
+                channelPoolRecord.goAway(frame);
+            } else {
+                log.error(() -> "Received GOAWAY on a channel (" + channel.id() + ") that is not managed by this type of "
+                                + "channel pool. The channel and its parents will be shut down, to prevent connection leaks.");
+                killChannelAndParents(channel);
+            }
+        } catch (Exception e) {
+            promise.setFailure(e);
+        }
+
+        promise.setSuccess(null);
+        return promise;
+    }
+
     private Future<Channel> acquire0(Promise<Channel> promise) {
         if (closed) {
             return promise.setFailure(new IllegalStateException("Channel pool is closed!"));
         }
 
         for (MultiplexedChannelRecord connection : connections) {
-            if (connection.availableStreams() > 0) {
-                connection.acquire(promise);
+            if (connection.numAvailableStreams() > 0) {
+                acquireChildChannel(promise, connection);
                 return promise;
             }
         }
+
         // No available streams, establish new connection and add it to list
-        connections.add(new MultiplexedChannelRecord(connectionPool.acquire(),
-                                                     maxConcurrencyPerConnection,
-                                                     this::releaseParentChannel)
-                            .acquire(promise));
+        Future<Channel> acquire = connectionPool.acquire();
+
+        MultiplexedChannelRecord channelRecord = new MultiplexedChannelRecord(acquire, maxConcurrencyPerConnection);
+        connections.add(channelRecord);
+
+        acquire.addListener(f -> {
+            if (acquire.isSuccess()) {
+                initializeChannelAttributes(channelRecord, acquire);
+            } else {
+                connections.remove(channelRecord);
+                channelRecord.shutdownChildChannels(acquire.cause());
+            }
+        });
+
+        acquireChildChannel(promise, channelRecord);
+
         return promise;
+    }
+
+    private void acquireChildChannel(MultiplexedChannelRecord channelRecord, Promise<Channel> promise) {
+        channelRecord.acquireChildChannel(promise);
+        promise.addListener(f -> childChannelAcquireComplete(channelRecord, promise));
+    }
+
+    private void childChannelAcquireComplete(MultiplexedChannelRecord channelRecord, Promise<Channel> promise) {
+        if (promise.isSuccess()) {
+            initializeChannelAttributes(channelRecord, promise);
+        } else {
+            Channel underlyingConnection = channelRecord.getConnection();
+            if (underlyingConnection == null) {
+                releaseParentChannel();
+            }
+        }
+    }
+
+    private void initializeChannelAttributes(MultiplexedChannelRecord channelRecord, Future<Channel> acquire) {
+        Channel channel = acquire.getNow();
+        channel.attr(ChannelAttributeKey.HTTP2_MULTIPLEXED_CHANNEL_POOL).set(this);
+        channel.attr(CHANNEL_POOL_RECORD).set(channelRecord);
     }
 
     /**
@@ -123,7 +225,7 @@ public class Http2MultiplexedChannelPool implements ChannelPool {
     private void releaseParentChannel0(Channel parentChannel, MultiplexedChannelRecord record) {
         if (parentChannel != null) {
             try {
-                parentChannel.close();
+                parentChannel.close().addListener(f -> warnOnCloseFailure(parentChannel, f));
             } finally {
                 connectionPool.release(parentChannel);
             }
@@ -155,7 +257,12 @@ public class Http2MultiplexedChannelPool implements ChannelPool {
             Channel parentChannel = channel.parent();
             MultiplexedChannelRecord channelRecord = parentChannel.attr(CHANNEL_POOL_RECORD).get();
             channelRecord.release(channel);
-            channel.close();
+            channel.close().addListener(f -> warnOnCloseFailure(channel, f));
+
+            if (channelRecord.isClosing() && channelRecord.numActiveChildChannels() == 0) {
+                releaseParentChannel(parentChannel);
+            }
+
             promise.setSuccess(null);
         }
     }
@@ -163,7 +270,7 @@ public class Http2MultiplexedChannelPool implements ChannelPool {
     private void releaseParentChannel(Channel parentChannel) {
         MultiplexedChannelRecord channelRecord = parentChannel.attr(CHANNEL_POOL_RECORD).get();
         connections.remove(channelRecord);
-        parentChannel.close();
+        parentChannel.close().addListener(f -> warnOnCloseFailure(parentChannel, f));
         connectionPool.release(parentChannel);
     }
 
@@ -192,5 +299,16 @@ public class Http2MultiplexedChannelPool implements ChannelPool {
             closedFuture.setSuccess(null);
         });
         return closedFuture;
+    }
+
+    private static void warnOnCloseFailure(Channel channel, Future<?> future) {
+        if (!future.isSuccess()) {
+            log.warn(() -> "Failure when closing channel: " + channel.id(), future.cause());
+        }
+    }
+
+    private void killChannelAndParents(Channel channel) {
+        Channel topmostParentChannel = NettyUtils.topmostParentChannel(channel);
+        topmostParentChannel.close().addListener(f -> warnOnCloseFailure(topmostParentChannel, f));
     }
 }

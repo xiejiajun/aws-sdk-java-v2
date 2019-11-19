@@ -15,6 +15,7 @@
 
 package software.amazon.awssdk.http.nio.netty.internal.utils;
 
+import io.netty.channel.Channel;
 import io.netty.util.concurrent.EventExecutor;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
@@ -136,5 +137,15 @@ public final class NettyUtils {
         } catch (Exception e) {
             promise.setFailure(e);
         }
+    }
+
+    public static Channel topmostParentChannel(Channel channel) {
+        Channel parent = channel.parent();
+        while (parent != null) {
+            channel = parent;
+            parent = parent.parent();
+        }
+
+        return channel;
     }
 }

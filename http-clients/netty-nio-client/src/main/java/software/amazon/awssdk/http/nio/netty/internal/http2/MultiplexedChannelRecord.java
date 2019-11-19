@@ -15,7 +15,6 @@
 
 package software.amazon.awssdk.http.nio.netty.internal.http2;
 
-import static software.amazon.awssdk.http.nio.netty.internal.ChannelAttributeKey.CHANNEL_POOL_RECORD;
 import static software.amazon.awssdk.http.nio.netty.internal.ChannelAttributeKey.PROTOCOL_FUTURE;
 import static software.amazon.awssdk.http.nio.netty.internal.utils.NettyUtils.asyncPromiseNotifyingBiConsumer;
 import static software.amazon.awssdk.http.nio.netty.internal.utils.NettyUtils.doInEventLoop;
@@ -38,6 +37,7 @@ import java.util.function.BiConsumer;
 import software.amazon.awssdk.annotations.SdkInternalApi;
 import software.amazon.awssdk.annotations.SdkTestInternalApi;
 import software.amazon.awssdk.http.Protocol;
+import software.amazon.awssdk.utils.Validate;
 
 /**
  * Contains a {@link Future} for the actual socket channel and tracks available
@@ -48,50 +48,40 @@ public class MultiplexedChannelRecord {
     private final Future<Channel> connectionFuture;
     private final Map<ChannelId, Http2StreamChannel> childChannels;
     private final AtomicLong availableStreams;
-    private final BiConsumer<Channel, MultiplexedChannelRecord> channelReleaser;
 
     private volatile Channel connection;
-    private volatile boolean goAway = false;
+    private volatile boolean isClosing = false;
 
     /**
      * @param connectionFuture Future for parent socket channel.
      * @param maxConcurrencyPerConnection Max streams allowed per connection.
-     * @param channelReleaser Method to release a channel and record on failure.
      */
-    MultiplexedChannelRecord(Future<Channel> connectionFuture,
-                             long maxConcurrencyPerConnection,
-                             BiConsumer<Channel, MultiplexedChannelRecord> channelReleaser) {
+    MultiplexedChannelRecord(Future<Channel> connectionFuture, long maxConcurrencyPerConnection) {
         this.connectionFuture = connectionFuture;
         this.availableStreams = new AtomicLong(maxConcurrencyPerConnection);
         this.childChannels = new ConcurrentHashMap<>(saturatedCast(maxConcurrencyPerConnection));
-        this.channelReleaser = channelReleaser;
     }
 
     @SdkTestInternalApi
     MultiplexedChannelRecord(Future<Channel> connectionFuture,
                              Channel connection,
-                             long maxConcurrencyPerConnection,
-                             BiConsumer<Channel, MultiplexedChannelRecord> channelReleaser) {
+                             long maxConcurrencyPerConnection) {
         this.connectionFuture = connectionFuture;
         this.childChannels = new ConcurrentHashMap<>(saturatedCast(maxConcurrencyPerConnection));
         this.availableStreams = new AtomicLong(maxConcurrencyPerConnection);
-        this.channelReleaser = channelReleaser;
-        this.connection = connection;
     }
 
-    MultiplexedChannelRecord acquire(Promise<Channel> channelPromise) {
+    MultiplexedChannelRecord acquireChildChannel(Promise<Channel> channelPromise) {
         availableStreams.decrementAndGet();
         if (connection != null) {
             createChildChannel(channelPromise);
         } else {
             connectionFuture.addListener((GenericFutureListener<Future<Channel>>) future -> {
                 if (future.isSuccess()) {
-                    connection = future.getNow();
-                    connection.attr(CHANNEL_POOL_RECORD).set(this);
+                    connection = connectionFuture.getNow();
                     createChildChannel(channelPromise);
                 } else {
                     channelPromise.setFailure(future.cause());
-                    channelReleaser.accept(connection, this);
                 }
             });
         }
@@ -103,10 +93,9 @@ public class MultiplexedChannelRecord {
      * streams newer than the last-stream-id on the go-away frame.
      */
     public void goAway(Http2GoAwayFrame frame) {
-        this.goAway = true;
+        this.isClosing = true;
         GoAwayException exception = new GoAwayException(frame.errorCode(), frame.content());
-        childChannels.entrySet().stream()
-                     .map(Map.Entry::getValue)
+        childChannels.values().stream()
                      .filter(cc -> cc.stream().id() > frame.lastStreamId())
                      .forEach(cc -> cc.eventLoop().execute(() -> shutdownChildChannel(cc, exception)));
     }
@@ -117,7 +106,7 @@ public class MultiplexedChannelRecord {
      * @param t Exception to deliver.
      */
     public void shutdownChildChannels(Throwable t) {
-        this.goAway = true;
+        this.isClosing = true;
         doInEventLoop(connection.eventLoop(), () -> {
             for (Channel childChannel : childChannels.values()) {
                 shutdownChildChannel(childChannel, t);
@@ -139,24 +128,29 @@ public class MultiplexedChannelRecord {
     }
 
     private void createChildChannel0(Promise<Channel> channelPromise) {
-        if (goAway) {
+        if (numAvailableStreams() == 0) {
             channelPromise.tryFailure(new IOException("No streams are available on this connection."));
         } else {
             // Once protocol future is notified then parent pipeline is configured and ready to go
             connection.attr(PROTOCOL_FUTURE).get()
-                      .whenComplete(asyncPromiseNotifyingBiConsumer(bootstrapChildChannel(), channelPromise));
+                      .whenComplete((protocol, exception) -> bootstrapChildChannel(protocol, exception, channelPromise));
         }
     }
 
     /**
      * Bootstraps the child stream channel and notifies the Promise on success or failure.
-     *
-     * @return BiConsumer that will bootstrap the child channel.
      */
-    private BiConsumer<Protocol, Promise<Channel>> bootstrapChildChannel() {
-        return (s, p) -> new Http2StreamChannelBootstrap(connection)
-            .open()
-            .addListener((GenericFutureListener<Future<Http2StreamChannel>>) future -> {
+    private void bootstrapChildChannel(Protocol protocol, Throwable exception, Promise<Channel> channelPromise) {
+        if (exception != null) {
+            channelPromise.setFailure(exception);
+            return;
+        }
+
+        try {
+            Validate.isTrue(protocol == Protocol.HTTP2, "Protocol was not HTTP/2.");
+
+            Future<Http2StreamChannel> stream = new Http2StreamChannelBootstrap(connection).open();
+            stream.addListener((GenericFutureListener<Future<Http2StreamChannel>>) future -> {
                 if (future.isSuccess()) {
                     Http2StreamChannel channel = future.getNow();
                     childChannels.put(channel.id(), channel);
@@ -166,8 +160,10 @@ public class MultiplexedChannelRecord {
                     }
                     availableStreams.incrementAndGet();
                 }
-            })
-            .addListener(promiseNotifyingListener(p));
+            }).addListener(promiseNotifyingListener(p));
+        } catch (Exception e) {
+            channelPromise.setFailure(e);
+        }
     }
 
     void release(Channel channel) {
@@ -179,8 +175,19 @@ public class MultiplexedChannelRecord {
         return connectionFuture;
     }
 
-    long availableStreams() {
-        return goAway ? 0 : availableStreams.get();
+    public Channel getConnection() {
+        return connection;
     }
 
+    long numAvailableStreams() {
+        return isClosing ? 0 : availableStreams.get();
+    }
+
+    long numActiveChildChannels() {
+        return childChannels.size();
+    }
+
+    boolean isClosing() {
+        return isClosing;
+    }
 }

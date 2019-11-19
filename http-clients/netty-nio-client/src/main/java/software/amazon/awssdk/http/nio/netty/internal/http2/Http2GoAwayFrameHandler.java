@@ -15,11 +15,13 @@
 
 package software.amazon.awssdk.http.nio.netty.internal.http2;
 
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http2.Http2GoAwayFrame;
 import software.amazon.awssdk.annotations.SdkInternalApi;
 import software.amazon.awssdk.http.nio.netty.internal.ChannelAttributeKey;
+import software.amazon.awssdk.utils.Logger;
 
 /**
  * Handles {@link Http2GoAwayFrame}s sent on a connection. This will pass the frame along to the connection's 
@@ -27,12 +29,18 @@ import software.amazon.awssdk.http.nio.netty.internal.ChannelAttributeKey;
  */
 @SdkInternalApi
 public class Http2GoAwayFrameHandler extends SimpleChannelInboundHandler<Http2GoAwayFrame> {
+    private static final Logger log = Logger.loggerFor(Http2GoAwayFrameHandler.class);
+
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, Http2GoAwayFrame frame)
     {
-        MultiplexedChannelRecord parentConnection = ctx.channel().attr(ChannelAttributeKey.CHANNEL_POOL_RECORD).get();
-        if (parentConnection != null) {
-            parentConnection.goAway(frame);
+        Channel channel = ctx.channel();
+        Http2MultiplexedChannelPool channelPool = channel.attr(ChannelAttributeKey.HTTP2_MULTIPLEXED_CHANNEL_POOL).get();
+        if (channelPool != null) {
+            channelPool.handleGoAway(channel, frame);
+        } else {
+            log.error(() -> "Received GOAWAY frame on a connection (" + channel.id() + ") that isn't associated with a "
+                            + "HTTP/2 channel pool. The GOAWAY will be ignored.");
         }
     }
 }

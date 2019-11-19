@@ -67,11 +67,13 @@ public final class Http2SettingsFrameHandler extends SimpleChannelInboundHandler
 
     private void channelError(Throwable cause, Channel ch) {
         ch.attr(PROTOCOL_FUTURE).get().completeExceptionally(cause);
-        MultiplexedChannelRecord record = ch.attr(ChannelAttributeKey.CHANNEL_POOL_RECORD).get();
+
+        Http2MultiplexedChannelPool record = ch.attr(ChannelAttributeKey.HTTP2_MULTIPLEXED_CHANNEL_POOL).get();
         // Deliver the exception to any child channels registered to this connection.
         if (record != null) {
-            record.shutdownChildChannels(cause);
+            record.handleConnectionLevelError(ch, cause);
         }
+
         // Channel status may still be active at this point even if it's not so queue up the close so that status is
         // accurately updated
         ch.eventLoop().submit(() -> {

@@ -23,6 +23,7 @@ import java.util.concurrent.CompletableFuture;
 import org.reactivestreams.Subscriber;
 import software.amazon.awssdk.annotations.SdkInternalApi;
 import software.amazon.awssdk.http.Protocol;
+import software.amazon.awssdk.http.nio.netty.internal.http2.Http2MultiplexedChannelPool;
 import software.amazon.awssdk.http.nio.netty.internal.http2.MultiplexedChannelRecord;
 
 /**
@@ -36,6 +37,12 @@ public final class ChannelAttributeKey {
      */
     public static final AttributeKey<CompletableFuture<Protocol>> PROTOCOL_FUTURE = AttributeKey.newInstance(
         "aws.http.nio.netty.async.protocolFuture");
+
+    /**
+     * Reference to {@link MultiplexedChannelRecord} which stores information about leased streams for a multiplexed connection.
+     */
+    public static final AttributeKey<Http2MultiplexedChannelPool> HTTP2_MULTIPLEXED_CHANNEL_POOL = AttributeKey.newInstance(
+        "aws.http.nio.netty.async.http2MultiplexedChannelPool");
 
     /**
      * Reference to {@link MultiplexedChannelRecord} which stores information about leased streams for a multiplexed connection.
