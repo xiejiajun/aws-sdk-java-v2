@@ -25,11 +25,11 @@ import software.amazon.awssdk.utils.Logger;
 
 /**
  * Handles {@link Http2GoAwayFrame}s sent on a connection. This will pass the frame along to the connection's 
- * {@link MultiplexedChannelRecord#goAway(Http2GoAwayFrame)} method.
+ * {@link MultiplexedChannelRecord#handleGoAway(Http2GoAwayFrame)} method.
  */
 @SdkInternalApi
 public class Http2GoAwayFrameHandler extends SimpleChannelInboundHandler<Http2GoAwayFrame> {
-    private static final Logger log = Logger.loggerFor(Http2GoAwayFrameHandler.class);
+    private static Logger log = Logger.loggerFor(Http2GoAwayFrameHandler.class);
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, Http2GoAwayFrame frame)
@@ -39,8 +39,8 @@ public class Http2GoAwayFrameHandler extends SimpleChannelInboundHandler<Http2Go
         if (channelPool != null) {
             channelPool.handleGoAway(channel, frame);
         } else {
-            log.error(() -> "Received GOAWAY frame on a connection (" + channel.id() + ") that isn't associated with a "
-                            + "HTTP/2 channel pool. The GOAWAY will be ignored.");
+            log.warn(() -> "GOAWAY received on a connection not associated with any multiplexed channel pool.");
+            channel.pipeline().fireExceptionCaught(new GoAwayException(frame.errorCode(), frame.content()));
         }
     }
 }

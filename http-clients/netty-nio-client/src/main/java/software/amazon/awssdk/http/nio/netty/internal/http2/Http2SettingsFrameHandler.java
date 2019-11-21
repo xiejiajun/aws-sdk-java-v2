@@ -28,7 +28,6 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import software.amazon.awssdk.annotations.SdkInternalApi;
 import software.amazon.awssdk.http.Protocol;
-import software.amazon.awssdk.http.nio.netty.internal.ChannelAttributeKey;
 
 /**
  * Configure channel based on the {@link Http2SettingsFrame} received from server
@@ -61,18 +60,13 @@ public final class Http2SettingsFrameHandler extends SimpleChannelInboundHandler
     }
 
     @Override
-    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
         channelError(cause, channel);
+        super.exceptionCaught(ctx, cause);
     }
 
     private void channelError(Throwable cause, Channel ch) {
         ch.attr(PROTOCOL_FUTURE).get().completeExceptionally(cause);
-
-        Http2MultiplexedChannelPool record = ch.attr(ChannelAttributeKey.HTTP2_MULTIPLEXED_CHANNEL_POOL).get();
-        // Deliver the exception to any child channels registered to this connection.
-        if (record != null) {
-            record.handleConnectionLevelError(ch, cause);
-        }
 
         // Channel status may still be active at this point even if it's not so queue up the close so that status is
         // accurately updated

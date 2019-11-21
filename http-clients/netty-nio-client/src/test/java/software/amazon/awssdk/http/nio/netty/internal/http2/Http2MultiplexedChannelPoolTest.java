@@ -23,16 +23,22 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.util.concurrent.DefaultPromise;
 import io.netty.util.concurrent.Promise;
+import io.netty.util.concurrent.SucceededFuture;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mockito;
 
 import java.util.Collections;
 import java.util.concurrent.CompletableFuture;
+import org.mockito.invocation.InvocationOnMock;
+import org.mockito.stubbing.Answer;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Matchers.eq;
+import static org.mockito.Matchers.isA;
 
 /**
  * Tests for {@link Http2MultiplexedChannelPool}.
@@ -51,29 +57,28 @@ public class Http2MultiplexedChannelPoolTest {
     }
 
     @Test
-    public void closeWaitsForConnectionToBeReleasedBeforeClosingConnectionPool() throws InterruptedException {
+    public void closeWaitsForConnectionToBeReleasedBeforeClosingConnectionPool() {
         SocketChannel channel = new NioSocketChannel();
         try {
             loopGroup.register(channel).awaitUninterruptibly();
-            Promise<Channel> channelPromise = new DefaultPromise<>(loopGroup.next());
-            channelPromise.setSuccess(channel);
 
             ChannelPool connectionPool = Mockito.mock(ChannelPool.class);
-            Promise<Void> releasePromise = Mockito.spy(new DefaultPromise<>(loopGroup.next()));
-            Mockito.doCallRealMethod().when(releasePromise).await();
-            releasePromise.setSuccess(null);
-            Mockito.when(connectionPool.release(Mockito.eq(channel))).thenReturn(releasePromise);
+            ArgumentCaptor<Promise> releasePromise = ArgumentCaptor.forClass(Promise.class);
+            Mockito.when(connectionPool.release(eq(channel), releasePromise.capture()))
+                   .thenAnswer(invocation -> {
+                       Promise<?> promise = releasePromise.getValue();
+                       promise.setSuccess(null);
+                       return promise;
+                   });
 
-            MultiplexedChannelRecord record = new MultiplexedChannelRecord(channelPromise,
-                                                                           channel,
-                                                                           8,
-                                                                           (ch, rec) -> {});
-            Http2MultiplexedChannelPool h2Pool = new Http2MultiplexedChannelPool(connectionPool, loopGroup.next(), 2, Collections.singletonList(record));
+
+            MultiplexedChannelRecord record = new MultiplexedChannelRecord(channel, 8);
+            Http2MultiplexedChannelPool h2Pool = new Http2MultiplexedChannelPool(connectionPool, loopGroup.next(), Collections.singletonList(record));
 
             h2Pool.close();
 
-            InOrder inOrder = Mockito.inOrder(connectionPool, releasePromise);
-            inOrder.verify(releasePromise).await();
+            InOrder inOrder = Mockito.inOrder(connectionPool);
+            inOrder.verify(connectionPool).release(eq(channel), isA(Promise.class));
             inOrder.verify(connectionPool).close();
         } finally {
             channel.close().awaitUninterruptibly();
@@ -84,14 +89,14 @@ public class Http2MultiplexedChannelPoolTest {
     public void acquireAfterCloseFails() throws InterruptedException {
         ChannelPool connectionPool = Mockito.mock(ChannelPool.class);
 
-        Http2MultiplexedChannelPool h2Pool = new Http2MultiplexedChannelPool(connectionPool, loopGroup.next(), 2, Collections.emptyList());
+        Http2MultiplexedChannelPool h2Pool = new Http2MultiplexedChannelPool(connectionPool, loopGroup.next(), Collections.emptyList());
 
         h2Pool.close();
 
         assertThat(h2Pool.acquire().await().isSuccess()).isFalse();
     }
 
-    @Test(timeout = 5_000)
+    @Test
     public void interruptDuringClosePreservesFlag() throws InterruptedException {
         SocketChannel channel = new NioSocketChannel();
         try {
@@ -102,14 +107,10 @@ public class Http2MultiplexedChannelPoolTest {
             ChannelPool connectionPool = Mockito.mock(ChannelPool.class);
             Promise<Void> releasePromise = Mockito.spy(new DefaultPromise<>(loopGroup.next()));
 
-            Mockito.when(connectionPool.release(Mockito.eq(channel))).thenReturn(releasePromise);
+            Mockito.when(connectionPool.release(eq(channel))).thenReturn(releasePromise);
 
-            MultiplexedChannelRecord record = new MultiplexedChannelRecord(channelPromise,
-                    channel,
-                    8,
-                    (ch, rec) -> {
-                    });
-            Http2MultiplexedChannelPool h2Pool = new Http2MultiplexedChannelPool(connectionPool, loopGroup.next(), 2, Collections.singletonList(record));
+            MultiplexedChannelRecord record = new MultiplexedChannelRecord(channel, 8);
+            Http2MultiplexedChannelPool h2Pool = new Http2MultiplexedChannelPool(connectionPool, loopGroup.next(), Collections.singletonList(record));
 
             CompletableFuture<Boolean> interrupteFlagPreserved = new CompletableFuture<>();
 

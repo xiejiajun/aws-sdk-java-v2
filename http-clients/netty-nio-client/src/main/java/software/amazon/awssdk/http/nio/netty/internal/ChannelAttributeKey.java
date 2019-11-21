@@ -45,12 +45,6 @@ public final class ChannelAttributeKey {
         "aws.http.nio.netty.async.http2MultiplexedChannelPool");
 
     /**
-     * Reference to {@link MultiplexedChannelRecord} which stores information about leased streams for a multiplexed connection.
-     */
-    public static final AttributeKey<MultiplexedChannelRecord> CHANNEL_POOL_RECORD = AttributeKey.newInstance(
-        "aws.http.nio.netty.async.channelPoolRecord");
-
-    /**
      * Value of the MAX_CONCURRENT_STREAMS from the server's SETTING frame.
      */
     public static final AttributeKey<Long> MAX_CONCURRENT_STREAMS = AttributeKey.newInstance(
