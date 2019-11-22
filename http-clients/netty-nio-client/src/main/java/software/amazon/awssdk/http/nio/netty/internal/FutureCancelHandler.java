@@ -37,6 +37,7 @@ public final class FutureCancelHandler extends ChannelInboundHandlerAdapter {
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable e) {
+        System.out.println(getClass() + ": " + e.getMessage());
         if (cancelled(ctx, e)) {
             RequestContext requestContext = ctx.channel().attr(REQUEST_CONTEXT_KEY).get();
             requestContext.handler().onError(e);

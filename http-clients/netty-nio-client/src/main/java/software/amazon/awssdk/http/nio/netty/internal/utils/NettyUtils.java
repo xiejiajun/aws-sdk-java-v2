@@ -30,12 +30,12 @@ import software.amazon.awssdk.utils.Logger;
 
 @SdkInternalApi
 public final class NettyUtils {
-    private static final Logger log = Logger.loggerFor(NettyUtils.class);
-
     /**
      * Completed succeed future.
      */
     public static final SucceededFuture<?> SUCCEEDED_FUTURE = new SucceededFuture<>(null, null);
+
+    private static final Logger log = Logger.loggerFor(NettyUtils.class);
 
     private NettyUtils() {
     }
@@ -165,7 +165,7 @@ public final class NettyUtils {
         if (!loop.inEventLoop()) {
             Exception exception =
                 new IllegalStateException("Execution is not in the expected event loop. Please report this issue to the "
-                                          + "AWS SDK for Java team on GitHub, because it could result in a race condition.");
+                                          + "AWS SDK for Java team on GitHub, because it could result in race conditions.");
             log.warn(() -> "Execution is happening outside of the expected event loop.", exception);
         }
     }

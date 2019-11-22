@@ -30,11 +30,8 @@ import io.netty.util.concurrent.DefaultPromise;
 import io.netty.util.concurrent.FailedFuture;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.Promise;
-import io.netty.util.concurrent.PromiseAggregator;
 import io.netty.util.concurrent.PromiseCombiner;
-import io.netty.util.concurrent.SucceededFuture;
 import java.io.IOException;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.concurrent.TimeUnit;
@@ -158,7 +155,8 @@ public class Http2MultiplexedChannelPool implements ChannelPool {
                                     + "streams was not initialized.", parentChannel);
                     Validate.isTrue(maxStreams > 0, "Maximum streams were negative on channel (%s).", parentChannel);
 
-                    MultiplexedChannelRecord multiplexedChannel = new MultiplexedChannelRecord(parentChannel, maxStreams);
+                    MultiplexedChannelRecord multiplexedChannel = new MultiplexedChannelRecord(parentChannel, eventLoop,
+                                                                                               maxStreams);
                     parentChannel.attr(MULTIPLEXED_CHANNEL).set(multiplexedChannel);
 
                     // Before we cache the connection, make sure that exceptions on the connection will remove it from the cache.
@@ -167,8 +165,7 @@ public class Http2MultiplexedChannelPool implements ChannelPool {
 
                     acquireChildStream(multiplexedChannel, promise);
                 }, promise);
-            })
-            .exceptionally(exception -> {
+            }).exceptionally(exception -> {
                 promise.setFailure(exception);
                 return null;
             });
@@ -279,7 +276,7 @@ public class Http2MultiplexedChannelPool implements ChannelPool {
             MultiplexedChannelRecord multiplexedChannel = parentChannel.attr(MULTIPLEXED_CHANNEL).get();
 
             if (multiplexedChannel != null) {
-                multiplexedChannel.handleGoAway(frame);
+                multiplexedChannel.handleGoAway(frame.copy());
             } else {
                 // If we don't have a multiplexed channel, the parent channel hasn't been fully initialized. Close it now.
                 closeAndReleaseParentChannel(parentChannel);
@@ -341,6 +338,7 @@ public class Http2MultiplexedChannelPool implements ChannelPool {
     private final class ReleaseOnExceptionHandler extends ChannelInboundHandlerAdapter {
         @Override
         public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+            System.out.println(getClass() + ": " + cause.getMessage());
             closeAndReleaseParentChannel(ctx.channel());
             super.exceptionCaught(ctx, cause);
         }

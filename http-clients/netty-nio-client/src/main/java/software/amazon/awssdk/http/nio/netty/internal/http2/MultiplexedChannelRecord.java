@@ -16,10 +16,11 @@
 package software.amazon.awssdk.http.nio.netty.internal.http2;
 
 import static software.amazon.awssdk.http.nio.netty.internal.utils.NettyUtils.doInEventLoop;
-import static software.amazon.awssdk.utils.NumericUtils.saturatedCast;
+import static software.amazon.awssdk.http.nio.netty.internal.utils.NettyUtils.warnIfNotInEventLoop;
 
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelId;
+import io.netty.channel.EventLoop;
 import io.netty.handler.codec.http2.Http2GoAwayFrame;
 import io.netty.handler.codec.http2.Http2StreamChannel;
 import io.netty.handler.codec.http2.Http2StreamChannelBootstrap;
@@ -39,19 +40,21 @@ import software.amazon.awssdk.annotations.SdkInternalApi;
 @SdkInternalApi
 public class MultiplexedChannelRecord {
     private final Channel connection;
+    private final EventLoop eventLoop;
     private final Map<ChannelId, Http2StreamChannel> childChannels;
     private final long maxConcurrencyPerConnection;
 
-    private volatile boolean isClosing = false;
+    private boolean isClosing = false;
 
-    MultiplexedChannelRecord(Channel connection, long maxConcurrencyPerConnection) {
+    MultiplexedChannelRecord(Channel connection, EventLoop eventLoop, long maxConcurrencyPerConnection) {
         this.connection = connection;
+        this.eventLoop = eventLoop;
         this.maxConcurrencyPerConnection = maxConcurrencyPerConnection;
-        this.childChannels = new ConcurrentHashMap<>(saturatedCast(maxConcurrencyPerConnection));
+        this.childChannels = new ConcurrentHashMap<>();
     }
 
     Future<Channel> acquireChildChannel() {
-        return acquireChildChannel(new DefaultPromise<>(connection.eventLoop()));
+        return acquireChildChannel(new DefaultPromise<>(eventLoop));
     }
 
     private Future<Channel> acquireChildChannel(Promise<Channel> channelPromise) {
@@ -64,11 +67,13 @@ public class MultiplexedChannelRecord {
      * streams newer than the last-stream-id on the go-away frame.
      */
     public void handleGoAway(Http2GoAwayFrame frame) {
+        warnIfNotInEventLoop(eventLoop);
+
         this.isClosing = true;
         GoAwayException exception = new GoAwayException(frame.errorCode(), frame.content());
         childChannels.values().stream()
                      .filter(cc -> cc.stream().id() > frame.lastStreamId())
-                     .forEach(cc -> cc.eventLoop().execute(() -> shutdownChildChannel(cc, exception)));
+                     .forEach(cc -> shutdownChildChannel(cc, exception));
     }
 
     /**
@@ -77,15 +82,16 @@ public class MultiplexedChannelRecord {
      * @param t Exception to deliver.
      */
     public void shutdown(Throwable t) {
+        warnIfNotInEventLoop(eventLoop);
+
         this.isClosing = true;
-        doInEventLoop(connection.eventLoop(), () -> {
-            for (Channel childChannel : childChannels.values()) {
-                shutdownChildChannel(childChannel, t);
-            }
-        });
+        for (Channel childChannel : childChannels.values()) {
+            shutdownChildChannel(childChannel, t);
+        }
     }
 
     private void shutdownChildChannel(Channel childChannel, Throwable t) {
+        System.err.println("Firing " + t + " on " + childChannel);
         childChannel.pipeline().fireExceptionCaught(t);
     }
 
@@ -95,10 +101,8 @@ public class MultiplexedChannelRecord {
      * @param channelPromise Promise to notify when channel is available.
      */
     private void createChildChannel(Promise<Channel> channelPromise) {
-        doInEventLoop(connection.eventLoop(), () -> createChildChannel0(channelPromise), channelPromise);
-    }
+        warnIfNotInEventLoop(eventLoop);
 
-    private void createChildChannel0(Promise<Channel> channelPromise) {
         if (numAvailableStreams() == 0) {
             channelPromise.tryFailure(new IOException("No streams are available on this connection."));
         } else {
@@ -107,6 +111,8 @@ public class MultiplexedChannelRecord {
     }
 
     private void bootstrapChildChannel(Promise<Channel> channelPromise) {
+        warnIfNotInEventLoop(eventLoop);
+
         try {
             Future<Http2StreamChannel> streamFuture = new Http2StreamChannelBootstrap(connection).open();
             streamFuture.addListener((GenericFutureListener<Future<Http2StreamChannel>>) future -> {
@@ -124,6 +130,7 @@ public class MultiplexedChannelRecord {
     }
 
     void release(Channel channel) {
+        warnIfNotInEventLoop(eventLoop);
         childChannels.remove(channel.id());
     }
 
@@ -132,14 +139,17 @@ public class MultiplexedChannelRecord {
     }
 
     long numAvailableStreams() {
+        warnIfNotInEventLoop(eventLoop);
         return isClosing ? 0 : maxConcurrencyPerConnection - childChannels.size();
     }
 
     long numActiveChildChannels() {
+        warnIfNotInEventLoop(eventLoop);
         return childChannels.size();
     }
 
     boolean isClosing() {
+        warnIfNotInEventLoop(eventLoop);
         return isClosing;
     }
 }

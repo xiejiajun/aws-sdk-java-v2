@@ -21,8 +21,10 @@ import io.netty.handler.codec.http2.Http2FrameReader;
 import io.netty.handler.codec.http2.Http2FrameWriter;
 import io.netty.handler.codec.http2.Http2Headers;
 import io.netty.handler.codec.http2.Http2Settings;
+import io.netty.handler.codec.http2.StreamBufferingEncoder;
 import io.netty.util.AttributeKey;
 import io.reactivex.Flowable;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -46,6 +48,7 @@ import software.amazon.awssdk.http.async.SdkAsyncHttpResponseHandler;
 import software.amazon.awssdk.http.nio.netty.EmptyPublisher;
 import software.amazon.awssdk.http.nio.netty.NettyNioAsyncHttpClient;
 import software.amazon.awssdk.http.nio.netty.SdkEventLoopGroup;
+import software.amazon.awssdk.utils.Validate;
 
 /**
  * Tests to ensure that the client behaves as expected when it receives GOAWAY messages.
@@ -173,6 +176,10 @@ public class GoAwayTest {
 
         assertThat(stream3Cf.isCompletedExceptionally()).isFalse();
         assertThat(stream5Cf.isCompletedExceptionally()).isTrue();
+        stream5Cf.exceptionally(e -> {
+            assertThat(e).isInstanceOf(IOException.class);
+            return null;
+        });
     }
 
     private CompletableFuture<Void> sendGetRequest() {

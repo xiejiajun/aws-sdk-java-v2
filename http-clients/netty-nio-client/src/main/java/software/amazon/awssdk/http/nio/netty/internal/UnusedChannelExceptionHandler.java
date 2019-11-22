@@ -46,6 +46,8 @@ public final class UnusedChannelExceptionHandler extends ChannelHandlerAdapter {
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+        System.out.println(getClass() + ": " + cause.getMessage());
+
         boolean channelInUse = getAttribute(ctx.channel(), ChannelAttributeKey.IN_USE).orElse(false);
 
         if (channelInUse) {

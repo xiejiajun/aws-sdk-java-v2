@@ -130,6 +130,7 @@ public class ResponseHandler extends SimpleChannelInboundHandler<HttpObject> {
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+        System.out.println(getClass() + ": " + cause.getMessage());
         RequestContext requestContext = ctx.channel().attr(REQUEST_CONTEXT_KEY).get();
         log.debug("Exception processing request: {}", requestContext.executeRequest().request(), cause);
         Throwable throwable = wrapException(cause);
@@ -387,7 +388,7 @@ public class ResponseHandler extends SimpleChannelInboundHandler<HttpObject> {
         handlerCtx.channel().attr(KEEP_ALIVE).set(false);
 
         if (!responseCompleted && !lastHttpContentReceived) {
-            IOException err = new IOException("Server failed to send complete response");
+            IOException err = new IOException("Server failed to send complete response. Logs may contain additional data.");
             runAndLogError("Fail to execute SdkAsyncHttpResponseHandler#onError", () -> requestCtx.handler().onError(err));
             executeFuture(handlerCtx).completeExceptionally(err);
             runAndLogError("Could not release channel", () -> closeAndRelease(handlerCtx));
