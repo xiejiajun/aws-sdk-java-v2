@@ -225,7 +225,7 @@ public class Http2MultiplexedChannelPool implements ChannelPool {
             // This isn't a child channel. Oddly enough, this is "expected" and is handled properly by the
             // BetterFixedChannelPool AS LONG AS we return an IllegalArgumentException via the promise.
             closeAndReleaseParent(childChannel);
-            return promise.setFailure(new IOException("Channel (" + childChannel + ") is not a child channel."));
+            return promise.setFailure(new IllegalArgumentException("Channel (" + childChannel + ") is not a child channel."));
         }
 
         Channel parentChannel = childChannel.parent();
