@@ -17,23 +17,18 @@ package software.amazon.awssdk.http.nio.netty.internal.http2;
 
 import static software.amazon.awssdk.http.nio.netty.internal.utils.NettyUtils.doInEventLoop;
 import static software.amazon.awssdk.http.nio.netty.internal.utils.NettyUtils.warnIfNotInEventLoop;
-import static software.amazon.awssdk.utils.NumericUtils.saturatedCast;
 
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelId;
-import io.netty.channel.EventLoop;
 import io.netty.handler.codec.http2.Http2GoAwayFrame;
 import io.netty.handler.codec.http2.Http2StreamChannel;
 import io.netty.handler.codec.http2.Http2StreamChannelBootstrap;
-import io.netty.util.concurrent.DefaultPromise;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
 import io.netty.util.concurrent.Promise;
-import io.netty.util.internal.MathUtil;
-import java.io.IOException;
+import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import software.amazon.awssdk.annotations.SdkInternalApi;
 import software.amazon.awssdk.utils.Logger;
 
@@ -46,28 +41,74 @@ public class MultiplexedChannelRecord {
     private static final Logger log = Logger.loggerFor(MultiplexedChannelRecord.class);
 
     private final Channel connection;
-    private final EventLoop eventLoop;
-    private final Map<ChannelId, Http2StreamChannel> childChannels;
     private final long maxConcurrencyPerConnection;
+    private final AtomicLong availableChildChannels;
 
-    private boolean isClosing = false;
-    private long availableChildChannels;
+    // Only read or write in the connection.eventLoop()
+    private final Map<ChannelId, Http2StreamChannel> childChannels = new HashMap<>();
 
-    MultiplexedChannelRecord(Channel connection, EventLoop eventLoop, long maxConcurrencyPerConnection) {
+    // Only write in the connection.eventLoop()
+    private volatile RecordState state = RecordState.OPEN;
+
+    MultiplexedChannelRecord(Channel connection, long maxConcurrencyPerConnection) {
         this.connection = connection;
-        this.eventLoop = eventLoop;
         this.maxConcurrencyPerConnection = maxConcurrencyPerConnection;
-        this.availableChildChannels = maxConcurrencyPerConnection;
-        this.childChannels = new ConcurrentHashMap<>();
+        this.availableChildChannels = new AtomicLong(maxConcurrencyPerConnection);
     }
 
-    Future<Channel> acquireChildChannel() {
-        return acquireChildChannel(new DefaultPromise<>(eventLoop));
+    boolean acquireStream(Promise<Channel> promise) {
+        if (reserveStream()) {
+            releaseReservationOnFailure(promise);
+            acquireReservedStream(promise);
+            return true;
+        }
+        return false;
     }
 
-    private Future<Channel> acquireChildChannel(Promise<Channel> channelPromise) {
-        createChildChannel(channelPromise);
-        return channelPromise;
+    private void acquireReservedStream(Promise<Channel> promise) {
+        doInEventLoop(connection.eventLoop(), () -> {
+            if (state != RecordState.OPEN) {
+                String message = "Connection received GOAWAY or was closed while acquiring new stream.";
+                promise.setFailure(new IllegalStateException(message));
+                return;
+            }
+
+            Future<Http2StreamChannel> streamFuture = new Http2StreamChannelBootstrap(connection).open();
+            streamFuture.addListener((GenericFutureListener<Future<Http2StreamChannel>>) future -> {
+                warnIfNotInEventLoop(connection.eventLoop());
+
+                if (!future.isSuccess()) {
+                    promise.setFailure(future.cause());
+                    return;
+                }
+
+                Http2StreamChannel channel = future.getNow();
+                childChannels.put(channel.id(), channel);
+                promise.setSuccess(channel);
+            });
+        }, promise);
+    }
+
+    private void releaseReservationOnFailure(Promise<Channel> promise) {
+        try {
+            promise.addListener(f -> {
+                if (!promise.isSuccess()) {
+                    releaseReservation();
+                }
+            });
+        } catch (Throwable e) {
+            releaseReservation();
+            throw e;
+        }
+    }
+
+    private void releaseReservation() {
+        if (availableChildChannels.incrementAndGet() > maxConcurrencyPerConnection) {
+            assert false;
+            log.warn(() -> "Child channel count was caught attempting to be increased over max concurrency. "
+                           + "Please report this issue to the AWS SDK for Java team.");
+            availableChildChannels.decrementAndGet();
+        }
     }
 
     /**
@@ -75,107 +116,91 @@ public class MultiplexedChannelRecord {
      * streams newer than the last-stream-id on the go-away frame.
      */
     public void handleGoAway(int lastStreamId, GoAwayException exception) {
-        warnIfNotInEventLoop(eventLoop);
+        doInEventLoop(connection.eventLoop(), () -> {
+            if (state == RecordState.CLOSED) {
+                return;
+            }
 
-        this.isClosing = true;
-        childChannels.values().stream()
-                     .filter(cc -> cc.stream().id() > lastStreamId)
-                     .forEach(cc -> shutdownChildChannel(cc, exception));
+            if (state == RecordState.OPEN) {
+                state = RecordState.CLOSED_TO_NEW;
+            }
+
+            childChannels.values().stream()
+                         .filter(cc -> cc.stream().id() > lastStreamId)
+                         .forEach(cc -> cc.pipeline().fireExceptionCaught(exception));
+        });
+    }
+
+    /**
+     * Close all registered child channels, and prohibit new streams from being created on this connection.
+     */
+    public void closeChildren() {
+        doInEventLoop(connection.eventLoop(), () -> {
+            if (state == RecordState.CLOSED) {
+                return;
+            }
+            state = RecordState.CLOSED;
+
+            for (Channel childChannel : childChannels.values()) {
+                childChannel.close();
+            }
+        });
     }
 
     /**
      * Delivers the exception to all registered child channels, and prohibits new streams being created on this connection.
-     *
-     * @param t Exception to deliver.
      */
-    public void shutdown(Throwable t) {
-        warnIfNotInEventLoop(eventLoop);
+    public void closeChildren(Throwable t) {
+        doInEventLoop(connection.eventLoop(), () -> {
+            if (state == RecordState.CLOSED) {
+                return;
+            }
+            state = RecordState.CLOSED;
 
-        this.isClosing = true;
-        for (Channel childChannel : childChannels.values()) {
-            shutdownChildChannel(childChannel, t);
-        }
+            for (Channel childChannel : childChannels.values()) {
+                childChannel.pipeline().fireExceptionCaught(t);
+            }
+        });
     }
 
-    private void shutdownChildChannel(Channel childChannel, Throwable t) {
-        log.debug(() -> "Firing exception to " + childChannel + " because of " + t.getMessage());
-        childChannel.pipeline().fireExceptionCaught(t);
-    }
-
-    /**
-     * Bootstraps a child stream channel from the parent socket channel. Done in parent channel event loop.
-     *
-     * @param channelPromise Promise to notify when channel is available.
-     */
-    private void createChildChannel(Promise<Channel> channelPromise) {
-        warnIfNotInEventLoop(eventLoop);
-
-        if (numAvailableStreams() == 0) {
-            channelPromise.tryFailure(new IOException("No streams are available on this connection."));
-        } else {
-            --availableChildChannels;
-            bootstrapChildChannel(channelPromise);
-        }
-    }
-
-    private void bootstrapChildChannel(Promise<Channel> channelPromise) {
-        warnIfNotInEventLoop(eventLoop);
-
-        try {
-            Future<Http2StreamChannel> streamFuture = new Http2StreamChannelBootstrap(connection).open();
-            streamFuture.addListener((GenericFutureListener<Future<Http2StreamChannel>>) future -> {
-                doInEventLoop(eventLoop, () -> {
-                    if (!future.isSuccess()) {
-                        ++availableChildChannels;
-                        channelPromise.setFailure(future.cause());
-                        return;
-                    }
-
-                    Http2StreamChannel channel = future.getNow();
-                    log.info(() -> "New stream (" + channel.id() + ") acquired on connection: " + channel.parent().id());
-                    if (isClosing) {
-                        Exception exception = new IOException("Connection was closed while acquiring stream.");
-                        channelPromise.setFailure(exception);
-                        shutdownChildChannel(channel, exception);
-                        return;
-                    }
-
-                    // TODO: Remove-on-exception?
-                    childChannels.put(channel.id(), channel);
-                    log.info(() -> "Channel count on " + channel.parent().id() + ": " + childChannels.size());
-                    channelPromise.setSuccess(channel);
-                }, channelPromise);
-            });
-        } catch (Exception e) {
-            channelPromise.setFailure(e);
-        }
-    }
-
-    void releaseNow(Channel channel) {
-        log.info(() -> "Stream (" + channel.id() + ") released on connection: " + channel.parent().id());
-
-        warnIfNotInEventLoop(eventLoop);
-        childChannels.remove(channel.id());
-        log.info(() -> "Channel count on " + channel.parent().id() + ": " + childChannels.size());
-        availableChildChannels++;
+    public void closeAndRelease(Channel childChannel) {
+        childChannel.close();
+        doInEventLoop(connection.eventLoop(), () -> {
+            childChannels.remove(childChannel.id());
+            releaseReservation();
+        });
     }
 
     public Channel getConnection() {
         return connection;
     }
 
-    long numAvailableStreams() {
-        warnIfNotInEventLoop(eventLoop);
-        return isClosing ? 0 : availableChildChannels;
+    public boolean reserveStream() {
+        for (int attempt = 0; attempt < 5; ++attempt) {
+            if (state != RecordState.OPEN) {
+                return false;
+            }
+
+            long currentlyAvailable = availableChildChannels.get();
+
+            if (currentlyAvailable <= 0) {
+                return false;
+            }
+            if (availableChildChannels.compareAndSet(currentlyAvailable, currentlyAvailable - 1)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
-    long numActiveChildChannels() {
-        warnIfNotInEventLoop(eventLoop);
-        return childChannels.size();
+    boolean canBeReleased() {
+        return state != RecordState.OPEN && availableChildChannels.get() == maxConcurrencyPerConnection;
     }
 
-    boolean isClosing() {
-        warnIfNotInEventLoop(eventLoop);
-        return isClosing;
+    private enum RecordState {
+        OPEN,
+        CLOSED_TO_NEW,
+        CLOSED
     }
 }

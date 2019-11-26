@@ -16,26 +16,25 @@
 package software.amazon.awssdk.http.nio.netty.internal.http2;
 
 import static software.amazon.awssdk.http.nio.netty.internal.utils.NettyUtils.doInEventLoop;
-import static software.amazon.awssdk.http.nio.netty.internal.utils.NettyUtils.warnIfNotInEventLoop;
 
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.EventLoop;
+import io.netty.channel.EventLoopGroup;
 import io.netty.channel.pool.ChannelPool;
-import io.netty.handler.codec.http2.Http2GoAwayFrame;
 import io.netty.handler.codec.http2.Http2StreamChannelBootstrap;
-import io.netty.handler.logging.LogLevel;
-import io.netty.handler.logging.LoggingHandler;
 import io.netty.util.AttributeKey;
-import io.netty.util.concurrent.DefaultPromise;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.Promise;
 import io.netty.util.concurrent.PromiseCombiner;
+import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import software.amazon.awssdk.annotations.SdkInternalApi;
 import software.amazon.awssdk.annotations.SdkTestInternalApi;
 import software.amazon.awssdk.http.Protocol;
@@ -64,73 +63,60 @@ public class Http2MultiplexedChannelPool implements ChannelPool {
      * Reference to the {@link MultiplexedChannelRecord} on a channel.
      */
     private static final AttributeKey<MultiplexedChannelRecord> MULTIPLEXED_CHANNEL = AttributeKey.newInstance(
-        "aws.http.nio.netty.async.channelPoolRecord");
+        "software.amazon.awssdk.http.nio.netty.internal.http2.Http2MultiplexedChannelPool.MULTIPLEXED_CHANNEL");
 
-    private static final Exception CHANNEL_POOL_CLOSED_EXCEPTION = new IllegalStateException("Channel pool is closed!");
+    /**
+     * Whether a parent channel has been released yet. This guards against double-releasing to the delegate connection pool.
+     */
+    private static final AttributeKey<Boolean> RELEASED = AttributeKey.newInstance(
+        "software.amazon.awssdk.http.nio.netty.internal.http2.Http2MultiplexedChannelPool.RELEASED");
 
-    private final EventLoop eventLoop;
     private final ChannelPool connectionPool;
-    private final ArrayList<MultiplexedChannelRecord> connections;
+    private final EventLoopGroup eventLoopGroup;
+    private final Set<MultiplexedChannelRecord> connections;
 
-    private boolean closed = false;
+    private AtomicBoolean closed = new AtomicBoolean(false);
 
     /**
      * @param connectionPool Connection pool for parent channels (i.e. the socket channel).
-     * @param eventLoop Event loop to run all tasks in.
      */
-    Http2MultiplexedChannelPool(ChannelPool connectionPool,
-                                EventLoop eventLoop) {
+    Http2MultiplexedChannelPool(ChannelPool connectionPool, EventLoopGroup eventLoopGroup) {
         this.connectionPool = connectionPool;
-        this.eventLoop = eventLoop;
-        // Customers that want an unbounded connection pool may set max concurrency to something like
-        // Long.MAX_VALUE so we just stick with the initial ArrayList capacity and grow from there.
-        this.connections = new ArrayList<>();
+        this.eventLoopGroup = eventLoopGroup;
+        this.connections = ConcurrentHashMap.newKeySet();
     }
 
     @SdkTestInternalApi
     Http2MultiplexedChannelPool(ChannelPool connectionPool,
-                                EventLoop eventLoop,
-                                Collection<MultiplexedChannelRecord> connections) {
-        this.connectionPool = connectionPool;
-        this.eventLoop = eventLoop;
-        this.connections = new ArrayList<>(connections);
+                                EventLoopGroup eventLoopGroup,
+                                Set<MultiplexedChannelRecord> connections) {
+        this(connectionPool, eventLoopGroup);
+        this.connections.addAll(connections);
     }
 
     @Override
     public Future<Channel> acquire() {
-        return acquire(new DefaultPromise<>(eventLoop));
+        return acquire(eventLoopGroup.next().newPromise());
     }
 
     @Override
     public Future<Channel> acquire(Promise<Channel> promise) {
-        doInEventLoop(eventLoop, () -> acquire0(promise), promise);
-        return promise;
-    }
-
-    private void acquire0(Promise<Channel> promise) {
-        warnIfNotInEventLoop(eventLoop);
-
-        if (closed) {
-            promise.setFailure(CHANNEL_POOL_CLOSED_EXCEPTION);
-            return;
+        if (closed.get()) {
+            return promise.setFailure(new IOException("Channel pool is closed!"));
         }
 
         for (MultiplexedChannelRecord multiplexedChannel : connections) {
-            long availableStreams = multiplexedChannel.numAvailableStreams();
-            System.out.println("Available Streams:" + availableStreams);
-            if (availableStreams > 0) {
-                acquireChildStream(multiplexedChannel, promise);
-                return;
+            if (acquireStreamOnInitializedConnection(multiplexedChannel, promise)) {
+                return promise;
             }
         }
 
         // No available streams on existing connections, establish new connection and add it to list
         acquireStreamOnNewConnection(promise);
+        return promise;
     }
 
     private void acquireStreamOnNewConnection(Promise<Channel> promise) {
-        warnIfNotInEventLoop(eventLoop);
-
         Future<Channel> newConnectionAcquire = connectionPool.acquire();
 
         newConnectionAcquire.addListener(f -> {
@@ -139,63 +125,84 @@ public class Http2MultiplexedChannelPool implements ChannelPool {
                 return;
             }
 
-
             Channel parentChannel = newConnectionAcquire.getNow();
-            log.info(() -> "Acquired a new HTTP/2 connection: " + parentChannel.id());
-            parentChannel.attr(ChannelAttributeKey.HTTP2_MULTIPLEXED_CHANNEL_POOL).set(this);
+            try {
+                parentChannel.attr(ChannelAttributeKey.HTTP2_MULTIPLEXED_CHANNEL_POOL).set(this);
 
-            // When the protocol future is completed on the new connection, we're ready for new streams to be added to it.
-            parentChannel.attr(ChannelAttributeKey.PROTOCOL_FUTURE).get().thenAccept(protocol -> {
-                doInEventLoop(eventLoop, () -> {
-                    log.info(() -> "Protocol negotiated on HTTP/2 connection: " + parentChannel.id());
-                    if (closed) {
-                        // This connection pool was closed while waiting for the future to complete. Give up the connection
-                        // we just finished creating.
-                        closeAndReleaseParentChannel(parentChannel);
-                        promise.setFailure(CHANNEL_POOL_CLOSED_EXCEPTION);
-                        return;
-                    }
-
-                    Long maxStreams = parentChannel.attr(ChannelAttributeKey.MAX_CONCURRENT_STREAMS).get();
-
-                    Validate.isTrue(protocol == Protocol.HTTP2,
-                                    "Protocol negotiated on connection (%s) was expected to be HTTP/2, but it "
-                                    + "was %s.", parentChannel, Protocol.HTTP1_1);
-                    Validate.isTrue(maxStreams != null,
-                                    "HTTP/2 was negotiated on the connection (%s), but the maximum number of "
-                                    + "streams was not initialized.", parentChannel);
-                    Validate.isTrue(maxStreams > 0, "Maximum streams were negative on channel (%s).", parentChannel);
-
-                    MultiplexedChannelRecord multiplexedChannel = new MultiplexedChannelRecord(parentChannel, eventLoop,
-                                                                                               maxStreams);
-                    parentChannel.attr(MULTIPLEXED_CHANNEL).set(multiplexedChannel);
-
-                    // Before we cache the connection, make sure that exceptions on the connection will remove it from the cache.
-                    parentChannel.pipeline()
-                                 .addLast(new ReleaseOnExceptionHandler());
-
-                    connections.add(multiplexedChannel);
-                    log.info(() -> "Connection count: " + connections.size());
-
-                    acquireChildStream(multiplexedChannel, promise);
-                }, promise);
-            }).exceptionally(exception -> {
-                promise.setFailure(exception);
-                return null;
-            });
+                // When the protocol future is completed on the new connection, we're ready for new streams to be added to it.
+                parentChannel.attr(ChannelAttributeKey.PROTOCOL_FUTURE).get()
+                             .thenAccept(protocol -> acquireStreamOnFreshConnection(promise, parentChannel, protocol))
+                             .exceptionally(throwable -> failAndCloseParent(promise, parentChannel, throwable));
+            } catch (Throwable e) {
+                failAndCloseParent(promise, parentChannel, e);
+            }
         });
     }
 
-    private void acquireChildStream(MultiplexedChannelRecord channelRecord, Promise<Channel> promise) {
-        Future<Channel> acquireFuture = channelRecord.acquireChildChannel();
-        acquireFuture.addListener(f -> {
+    private void acquireStreamOnFreshConnection(Promise<Channel> promise, Channel parentChannel, Protocol protocol) {
+        try {
+            Long maxStreams = parentChannel.attr(ChannelAttributeKey.MAX_CONCURRENT_STREAMS).get();
+
+            Validate.isTrue(protocol == Protocol.HTTP2,
+                            "Protocol negotiated on connection (%s) was expected to be HTTP/2, but it "
+                            + "was %s.", parentChannel, Protocol.HTTP1_1);
+            Validate.isTrue(maxStreams != null,
+                            "HTTP/2 was negotiated on the connection (%s), but the maximum number of "
+                            + "streams was not initialized.", parentChannel);
+            Validate.isTrue(maxStreams > 0, "Maximum streams were negative on channel (%s).", parentChannel);
+
+            MultiplexedChannelRecord multiplexedChannel = new MultiplexedChannelRecord(parentChannel, maxStreams);
+            parentChannel.attr(MULTIPLEXED_CHANNEL).set(multiplexedChannel);
+
+            // Before we cache the connection, make sure that exceptions on the connection will remove it from the cache.
+            parentChannel.pipeline().addLast(new ReleaseOnExceptionHandler());
+
+            if (!acquireStreamOnInitializedConnection(multiplexedChannel, promise)) {
+                failAndCloseParent(promise, parentChannel,
+                                   new IOException("Connection was closed while creating a new stream."));
+                return;
+            }
+
+            connections.add(multiplexedChannel);
+
+            if (closed.get()) {
+                // Whoops, we were closed while we were setting up. Make sure everything here is cleaned up properly.
+                failAndCloseParent(promise, parentChannel,
+                                   new IOException("Connection pool was closed while creating a new stream."));
+            }
+        } catch (Throwable e) {
+            failAndCloseParent(promise, parentChannel, e);
+        }
+    }
+
+    private Void failAndCloseParent(Promise<Channel> promise, Channel parentChannel, Throwable exception) {
+        promise.setFailure(exception);
+        closeAndReleaseParent(parentChannel);
+        return null;
+    }
+
+    /**
+     * Acquire a stream on a connection that has already been initialized. This will return false if the connection cannot have
+     * any more streams allocated, and true if the stream can be allocated.
+     *
+     * This will NEVER complete the provided future when the return value is false. This will ALWAYS complete the provided
+     * future when the return value is true.
+     */
+    private boolean acquireStreamOnInitializedConnection(MultiplexedChannelRecord channelRecord, Promise<Channel> promise) {
+        Promise<Channel> acquirePromise = channelRecord.getConnection().eventLoop().newPromise();
+
+        if (!channelRecord.acquireStream(acquirePromise)) {
+            return false;
+        }
+
+        acquirePromise.addListener(f -> {
             try {
-                if (!acquireFuture.isSuccess()) {
-                    promise.setFailure(acquireFuture.cause());
+                if (!acquirePromise.isSuccess()) {
+                    promise.setFailure(acquirePromise.cause());
                     return;
                 }
 
-                Channel channel = acquireFuture.getNow();
+                Channel channel = acquirePromise.getNow();
                 channel.attr(ChannelAttributeKey.HTTP2_MULTIPLEXED_CHANNEL_POOL).set(this);
                 channel.attr(MULTIPLEXED_CHANNEL).set(channelRecord);
                 promise.setSuccess(channel);
@@ -203,28 +210,22 @@ public class Http2MultiplexedChannelPool implements ChannelPool {
                 promise.setFailure(e);
             }
         });
+
+        return true;
     }
 
     @Override
     public Future<Void> release(Channel childChannel) {
-        return release(childChannel, new DefaultPromise<>(eventLoop));
+        return release(childChannel, childChannel.eventLoop().newPromise());
     }
 
     @Override
     public Future<Void> release(Channel childChannel, Promise<Void> promise) {
-        doInEventLoop(eventLoop, () -> releaseChildChannel0(childChannel, promise), promise);
-        return promise;
-    }
-
-    private void releaseChildChannel0(Channel childChannel, Promise<Void> promise) {
-        warnIfNotInEventLoop(eventLoop);
-
         if (childChannel.parent() == null) {
-            // This isn't a child channel. Notify it that something is wrong.
-            Exception exception = new IllegalArgumentException("Channel (" + childChannel + ") is not a child channel.");
-            childChannel.pipeline().fireExceptionCaught(exception);
-            promise.setFailure(exception);
-            return;
+            // This isn't a child channel. Oddly enough, this is "expected" and is handled properly by the
+            // BetterFixedChannelPool AS LONG AS we return an IllegalArgumentException via the promise.
+            closeAndReleaseParent(childChannel);
+            return promise.setFailure(new IOException("Channel (" + childChannel + ") is not a child channel."));
         }
 
         Channel parentChannel = childChannel.parent();
@@ -232,70 +233,58 @@ public class Http2MultiplexedChannelPool implements ChannelPool {
         if (multiplexedChannel == null) {
             // This is a child channel, but there is no attached multiplexed channel, which there should be if it was from
             // this pool. Notify it that something is wrong.
-            Exception exception =
-                new IllegalArgumentException("Channel (" + childChannel + ") is not associated with any channel records.");
+            Exception exception = new IOException("Channel (" + childChannel + ") is not associated with any channel records.");
             childChannel.pipeline().fireExceptionCaught(exception);
-            promise.setFailure(exception);
-            return;
+            return promise.setFailure(exception);
         }
 
-        multiplexedChannel.releaseNow(childChannel);
-        childChannel.eventLoop().submit(() -> {
-            log.info(() -> "Closing child channel: " + childChannel.id());
-            childChannel.close();
-        });
-//        childChannel.close();
+        multiplexedChannel.closeAndRelease(childChannel);
 
-        if (multiplexedChannel.isClosing() && multiplexedChannel.numActiveChildChannels() == 0) {
+        if (multiplexedChannel.canBeReleased()) {
             // We just closed the last stream in a connection that has reached the end of its life.
-            closeAndReleaseParentChannel(parentChannel);
+            return closeAndReleaseParent(parentChannel, null, promise);
         }
 
-        promise.setSuccess(null);
+        return promise.setSuccess(null);
     }
 
-    private Future<?> closeAndReleaseParentChannel(Channel parentChannel) {
-        Promise<Void> resultPromise = new DefaultPromise<>(eventLoop);
-        doInEventLoop(eventLoop, () -> closeAndReleaseParentChannel0(parentChannel, resultPromise), resultPromise);
-        return resultPromise;
+    private Future<Void> closeAndReleaseParent(Channel parentChannel) {
+        return closeAndReleaseParent(parentChannel, null, parentChannel.eventLoop().newPromise());
     }
 
-    private Future<?> closeAndReleaseParentChannel0(Channel parentChannel, Promise<Void> resultPromise) {
-        warnIfNotInEventLoop(eventLoop);
+    private Future<Void> closeAndReleaseParent(Channel parentChannel, Throwable cause) {
+        return closeAndReleaseParent(parentChannel, cause, parentChannel.eventLoop().newPromise());
+    }
 
+    private Future<Void> closeAndReleaseParent(Channel parentChannel, Throwable cause, Promise<Void> resultPromise) {
         if (parentChannel.parent() != null) {
             // This isn't a parent channel. Notify it that something is wrong.
-            Exception exception = new IllegalArgumentException("Channel (" + parentChannel + ") is not a parent channel.");
+            Exception exception = new IOException("Channel (" + parentChannel + ") is not a parent channel.");
             parentChannel.pipeline().fireExceptionCaught(exception);
-            resultPromise.setFailure(exception);
-            return resultPromise;
+            return resultPromise.setFailure(exception);
         }
 
         MultiplexedChannelRecord multiplexedChannel = parentChannel.attr(MULTIPLEXED_CHANNEL).get();
 
         // We may not have a multiplexed channel if the parent channel hasn't been fully initialized.
         if (multiplexedChannel != null) {
+            if (cause == null) {
+                multiplexedChannel.closeChildren();
+            } else {
+                multiplexedChannel.closeChildren(cause);
+            }
             connections.remove(multiplexedChannel);
-            log.info(() -> "Connection count: " + connections.size());
         }
 
-        parentChannel.eventLoop().submit(() -> {
-            log.info(() -> "Closing parent channel: " + parentChannel.id());
-            parentChannel.close();
-        });
+        parentChannel.close();
+        if (parentChannel.attr(RELEASED).getAndSet(Boolean.TRUE) == null) {
+            return connectionPool.release(parentChannel, resultPromise);
+        }
 
-        log.info(() -> "Connection released: " + parentChannel.id());
-        connectionPool.release(parentChannel, resultPromise);
-        return resultPromise;
+        return resultPromise.setSuccess(null);
     }
 
     public void handleGoAway(Channel parentChannel, int lastStreamId, GoAwayException exception) {
-        doInEventLoop(eventLoop, () -> handleGoAway0(parentChannel, lastStreamId, exception));
-    }
-
-    private void handleGoAway0(Channel parentChannel, int lastStreamId, GoAwayException exception) {
-        warnIfNotInEventLoop(eventLoop);
-
         log.debug(() -> "Received GOAWAY on " + parentChannel + " with lastStreamId of " + lastStreamId);
         try {
             MultiplexedChannelRecord multiplexedChannel = parentChannel.attr(MULTIPLEXED_CHANNEL).get();
@@ -304,7 +293,7 @@ public class Http2MultiplexedChannelPool implements ChannelPool {
                 multiplexedChannel.handleGoAway(lastStreamId, exception);
             } else {
                 // If we don't have a multiplexed channel, the parent channel hasn't been fully initialized. Close it now.
-                closeAndReleaseParentChannel(parentChannel);
+                closeAndReleaseParent(parentChannel);
             }
         } catch (Exception e) {
             log.error(() -> "Failed to handle GOAWAY frame on channel " + parentChannel, e);
@@ -313,66 +302,53 @@ public class Http2MultiplexedChannelPool implements ChannelPool {
 
     @Override
     public void close() {
-        if (closed) {
-            // Optimization: This is a non-volatile read, so no guarantees that the value is accurate.
-            return;
-        }
+        if (closed.compareAndSet(false, true)) {
+            Future<?> closeCompleteFuture = doClose();
 
-        Promise<?> closeCompletePromise = new DefaultPromise<>(eventLoop);
-        doInEventLoop(eventLoop, () -> close0(closeCompletePromise), closeCompletePromise);
-
-        try {
-            if (!closeCompletePromise.await(10, TimeUnit.SECONDS)) {
-                throw new RuntimeException("Event loop didn't close after 10 seconds.");
+            try {
+                if (!closeCompleteFuture.await(10, TimeUnit.SECONDS)) {
+                    throw new RuntimeException("Event loop didn't close after 10 seconds.");
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new RuntimeException(e);
             }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new RuntimeException(e);
-        }
 
-        Throwable exception = closeCompletePromise.cause();
-        if (exception != null) {
-            throw new RuntimeException("Failed to close channel pool.", exception);
+            Throwable exception = closeCompleteFuture.cause();
+            if (exception != null) {
+                throw new RuntimeException("Failed to close channel pool.", exception);
+            }
         }
     }
 
-    private void close0(Promise<?> closePromise) {
-        warnIfNotInEventLoop(eventLoop);
+    private Future<?> doClose() {
+        EventLoop closeEventLoop = eventLoopGroup.next();
+        Promise<?> closeFinishedPromise = closeEventLoop.newPromise();
 
-        if (closed) {
-            closePromise.setSuccess(null);
-        }
-        closed = true;
+        doInEventLoop(closeEventLoop, () -> {
+            Promise<Void> releaseAllChannelsPromise = closeEventLoop.newPromise();
+            PromiseCombiner promiseCombiner = new PromiseCombiner(closeEventLoop);
 
-        Promise<Void> releaseAllChannelsPromise = new DefaultPromise<>(eventLoop);
+            // Create a copy of the connections to remove while we close them, in case closing updates the original list.
+            List<MultiplexedChannelRecord> channelsToRemove = new ArrayList<>(connections);
+            for (MultiplexedChannelRecord channel : channelsToRemove) {
+                promiseCombiner.add(closeAndReleaseParent(channel.getConnection()));
+            }
+            promiseCombiner.finish(releaseAllChannelsPromise);
 
-        PromiseCombiner promiseCombiner = new PromiseCombiner(eventLoop);
-
-        // Create a copy of the connections to remove while we close them, in case closing updates the original list.
-        List<MultiplexedChannelRecord> channelsToRemove = new ArrayList<>(connections);
-        for (MultiplexedChannelRecord channel : channelsToRemove) {
-            promiseCombiner.add(closeAndReleaseParentChannel0(channel.getConnection(), new DefaultPromise<>(eventLoop)));
-        }
-        promiseCombiner.finish(releaseAllChannelsPromise);
-
-        releaseAllChannelsPromise.addListener(f -> {
-            connectionPool.close();
-            closePromise.setSuccess(null);
+            releaseAllChannelsPromise.addListener(f -> {
+                connectionPool.close();
+                closeFinishedPromise.setSuccess(null);
+            });
         });
+
+        return closeFinishedPromise;
     }
 
     private final class ReleaseOnExceptionHandler extends ChannelDuplexHandler {
         @Override
         public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-            doInEventLoop(eventLoop, () -> {
-                Channel channel = ctx.channel();
-                MultiplexedChannelRecord multiplexedChannel = channel.attr(MULTIPLEXED_CHANNEL).get();
-                if (multiplexedChannel != null) {
-                    multiplexedChannel.shutdown(cause);
-                }
-
-                closeAndReleaseParentChannel(channel);
-            });
+            closeAndReleaseParent(ctx.channel(), cause);
         }
     }
 }

@@ -77,12 +77,12 @@ public class GoAwayTest {
     }
 
     @Test
-    public void goAwayConnectionsAreClosedAfterStreamsAreReleased() throws InterruptedException {
+    public void goAwayCanCloseAllStreams() throws InterruptedException {
         // TODO: WIP
 
         ConcurrentHashMap<String, Set<Integer>> channelToStreams = new ConcurrentHashMap<>();
 
-        CountDownLatch allRequestsReceived = new CountDownLatch(1);
+        CountDownLatch allRequestsReceived = new CountDownLatch(2);
         byte[] getPayload = "I'm about to close up on you!".getBytes(StandardCharsets.UTF_8);
         Supplier<Http2FrameListener> frameListenerSupplier = () -> new TestFrameListener() {
             @Override

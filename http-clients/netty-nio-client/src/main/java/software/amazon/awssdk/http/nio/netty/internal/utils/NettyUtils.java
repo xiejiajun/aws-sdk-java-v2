@@ -152,16 +152,8 @@ public final class NettyUtils {
         }
     }
 
-    public static void fireExceptionOnChannelAndParents(Channel channel, Throwable t) {
-        if (channel == null) {
-            return;
-        }
-
-        channel.pipeline().fireExceptionCaught(t);
-        fireExceptionOnChannelAndParents(channel.parent(), t);
-    }
-
     public static void warnIfNotInEventLoop(EventLoop loop) {
+        assert loop.inEventLoop();
         if (!loop.inEventLoop()) {
             Exception exception =
                 new IllegalStateException("Execution is not in the expected event loop. Please report this issue to the "

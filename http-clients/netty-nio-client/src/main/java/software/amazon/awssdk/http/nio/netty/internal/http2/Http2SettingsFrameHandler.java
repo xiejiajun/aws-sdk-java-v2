@@ -61,7 +61,6 @@ public final class Http2SettingsFrameHandler extends SimpleChannelInboundHandler
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-        System.out.println(getClass() + ": " + cause.getMessage());
         channelError(cause, channel);
         super.exceptionCaught(ctx, cause);
     }

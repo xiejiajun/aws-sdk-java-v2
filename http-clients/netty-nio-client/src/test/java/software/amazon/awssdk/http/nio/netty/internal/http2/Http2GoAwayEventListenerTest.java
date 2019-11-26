@@ -32,8 +32,7 @@ import org.junit.Before;
 import org.junit.Test;
 import software.amazon.awssdk.http.nio.netty.internal.ChannelAttributeKey;
 
-public class Http2GoAwayEventHandlerTest {
-    private static final DefaultHttp2GoAwayFrame GO_AWAY_FRAME = new DefaultHttp2GoAwayFrame(0, Unpooled.EMPTY_BUFFER);
+public class Http2GoAwayEventListenerTest {
     private ChannelHandlerContext ctx;
     private Channel channel;
     private ChannelPipeline channelPipeline;
