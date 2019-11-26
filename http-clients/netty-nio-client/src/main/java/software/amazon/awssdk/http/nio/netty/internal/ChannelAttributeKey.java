@@ -24,7 +24,6 @@ import org.reactivestreams.Subscriber;
 import software.amazon.awssdk.annotations.SdkInternalApi;
 import software.amazon.awssdk.http.Protocol;
 import software.amazon.awssdk.http.nio.netty.internal.http2.Http2MultiplexedChannelPool;
-import software.amazon.awssdk.http.nio.netty.internal.http2.MultiplexedChannelRecord;
 
 /**
  * Keys for attributes attached via {@link io.netty.channel.Channel#attr(AttributeKey)}.
@@ -39,7 +38,7 @@ public final class ChannelAttributeKey {
         "aws.http.nio.netty.async.protocolFuture");
 
     /**
-     * Reference to {@link MultiplexedChannelRecord} which stores information about leased streams for a multiplexed connection.
+     * Reference to {@link Http2MultiplexedChannelPool} which stores information about leased streams for a multiplexed connection.
      */
     public static final AttributeKey<Http2MultiplexedChannelPool> HTTP2_MULTIPLEXED_CHANNEL_POOL = AttributeKey.newInstance(
         "aws.http.nio.netty.async.http2MultiplexedChannelPool");
