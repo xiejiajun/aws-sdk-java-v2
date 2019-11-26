@@ -130,7 +130,7 @@ public class ResponseHandler extends SimpleChannelInboundHandler<HttpObject> {
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-        System.out.println(getClass() + ": " + cause.getMessage());
+        log.error("EXCEPTION CAUGHT!!!!", cause);
         RequestContext requestContext = ctx.channel().attr(REQUEST_CONTEXT_KEY).get();
         log.debug("Exception processing request: {}", requestContext.executeRequest().request(), cause);
         Throwable throwable = wrapException(cause);
@@ -269,7 +269,9 @@ public class ResponseHandler extends SimpleChannelInboundHandler<HttpObject> {
                     }
                     try {
                         runAndLogError(String.format("Subscriber %s threw an exception in onError.", subscriber.toString()),
-                            () -> subscriber.onError(t));
+                            () -> {
+                            subscriber.onError(t);
+                            });
                         notifyError(t);
                     } finally {
                         runAndLogError("Could not release channel back to the pool",

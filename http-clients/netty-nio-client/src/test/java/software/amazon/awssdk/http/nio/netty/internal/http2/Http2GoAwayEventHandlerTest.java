@@ -15,6 +15,7 @@
 
 package software.amazon.awssdk.http.nio.netty.internal.http2;
 
+import static org.mockito.Matchers.eq;
 import static org.mockito.Matchers.isA;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -25,14 +26,13 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPipeline;
-import io.netty.channel.ChannelPipelineException;
 import io.netty.handler.codec.http2.DefaultHttp2GoAwayFrame;
 import io.netty.util.Attribute;
 import org.junit.Before;
 import org.junit.Test;
 import software.amazon.awssdk.http.nio.netty.internal.ChannelAttributeKey;
 
-public class Http2GoAwayFrameHandlerTest {
+public class Http2GoAwayEventHandlerTest {
     private static final DefaultHttp2GoAwayFrame GO_AWAY_FRAME = new DefaultHttp2GoAwayFrame(0, Unpooled.EMPTY_BUFFER);
     private ChannelHandlerContext ctx;
     private Channel channel;
@@ -52,18 +52,18 @@ public class Http2GoAwayFrameHandlerTest {
     }
 
     @Test
-    public void goAwayWithNoChannelPoolRecordRaisesNoExceptions() {
+    public void goAwayWithNoChannelPoolRecordRaisesNoExceptions() throws Exception {
         when(attribute.get()).thenReturn(null);
-        new Http2GoAwayFrameHandler().channelRead0(ctx, GO_AWAY_FRAME);
+        new Http2GoAwayEventListener(channel).onGoAwayReceived(0, 0, Unpooled.EMPTY_BUFFER);
         verify(channelPipeline).fireExceptionCaught(isA(GoAwayException.class));
     }
 
     @Test
-    public void goAwayWithChannelPoolRecordPassesAlongTheFrame() {
+    public void goAwayWithChannelPoolRecordPassesAlongTheFrame() throws Exception {
         Http2MultiplexedChannelPool record = mock(Http2MultiplexedChannelPool.class);
         when(attribute.get()).thenReturn(record);
-        new Http2GoAwayFrameHandler().channelRead0(ctx, GO_AWAY_FRAME);
-        verify(record).handleGoAway(channel, GO_AWAY_FRAME);
+        new Http2GoAwayEventListener(channel).onGoAwayReceived(0, 0, Unpooled.EMPTY_BUFFER);
+        verify(record).handleGoAway(eq(channel), eq(0), isA(GoAwayException.class));
         verifyNoMoreInteractions(record);
     }
 }

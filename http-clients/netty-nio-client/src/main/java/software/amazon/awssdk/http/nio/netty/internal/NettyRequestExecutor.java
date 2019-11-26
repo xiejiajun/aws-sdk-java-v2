@@ -39,6 +39,8 @@ import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpVersion;
+import io.netty.handler.logging.LogLevel;
+import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.timeout.ReadTimeoutException;
 import io.netty.handler.timeout.ReadTimeoutHandler;
 import io.netty.handler.timeout.WriteTimeoutException;
@@ -102,7 +104,12 @@ public final class NettyRequestExecutor {
      * @return The created execution future.
      */
     private CompletableFuture<Void> createExecuteFuture(Promise<Channel> channelPromise) {
-        CompletableFuture<Void> future = new CompletableFuture<>();
+        CompletableFuture<Void> future = new CompletableFuture<Void>() {
+            @Override
+            public boolean complete(Void value) {
+                return super.complete(value);
+            }
+        };
 
         future.whenComplete((r, t) -> {
             if (t == null) {
@@ -157,6 +164,7 @@ public final class NettyRequestExecutor {
     private boolean tryConfigurePipeline() {
         Protocol protocol = ChannelAttributeKey.getProtocolNow(channel);
         ChannelPipeline pipeline = channel.pipeline();
+
         switch (protocol) {
             case HTTP2:
                 pipeline.addLast(new Http2ToHttpInboundAdapter());
