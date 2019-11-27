@@ -20,6 +20,7 @@ import static software.amazon.awssdk.http.nio.netty.internal.utils.NettyUtils.do
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelPromise;
 import io.netty.channel.EventLoop;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.pool.ChannelPool;
@@ -107,8 +108,7 @@ public class Http2MultiplexedChannelPool implements ChannelPool {
         }
 
         for (MultiplexedChannelRecord multiplexedChannel : connections) {
-            if (connectionIsHealthy(multiplexedChannel) &&
-                acquireStreamOnInitializedConnection(multiplexedChannel, promise)) {
+            if (acquireStreamOnInitializedConnection(multiplexedChannel, promise)) {
                 return promise;
             }
         }
@@ -116,19 +116,6 @@ public class Http2MultiplexedChannelPool implements ChannelPool {
         // No available streams on existing connections, establish new connection and add it to list
         acquireStreamOnNewConnection(promise);
         return promise;
-    }
-
-    /**
-     * Validate that the provided connection seems healthy. If so, return true. If not, release it and return false.
-     */
-    private boolean connectionIsHealthy(MultiplexedChannelRecord multiplexedChannel) {
-        Channel parentChannel = multiplexedChannel.getConnection();
-        if (parentChannel.isActive()) {
-            return true;
-        } else {
-            closeAndReleaseParent(parentChannel, new ClosedChannelException());
-            return false;
-        }
     }
 
     private void acquireStreamOnNewConnection(Promise<Channel> promise) {
@@ -198,7 +185,6 @@ public class Http2MultiplexedChannelPool implements ChannelPool {
 
         // Before we cache the connection, make sure that exceptions on the connection will remove it from the cache.
         parentChannel.pipeline().addLast(new ReleaseOnExceptionHandler());
-
         connections.add(multiplexedChannel);
 
         if (closed.get()) {
@@ -382,6 +368,11 @@ public class Http2MultiplexedChannelPool implements ChannelPool {
     }
 
     private final class ReleaseOnExceptionHandler extends ChannelDuplexHandler {
+        @Override
+        public void channelInactive(ChannelHandlerContext ctx) {
+            closeAndReleaseParent(ctx.channel(), new ClosedChannelException());
+        }
+
         @Override
         public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
             closeAndReleaseParent(ctx.channel(), cause);
