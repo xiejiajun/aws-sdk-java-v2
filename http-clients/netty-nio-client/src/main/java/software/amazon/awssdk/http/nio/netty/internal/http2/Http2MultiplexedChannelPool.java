@@ -29,6 +29,7 @@ import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.Promise;
 import io.netty.util.concurrent.PromiseCombiner;
 import java.io.IOException;
+import java.nio.channels.ClosedChannelException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -106,7 +107,8 @@ public class Http2MultiplexedChannelPool implements ChannelPool {
         }
 
         for (MultiplexedChannelRecord multiplexedChannel : connections) {
-            if (acquireStreamOnInitializedConnection(multiplexedChannel, promise)) {
+            if (connectionIsHealthy(multiplexedChannel) &&
+                acquireStreamOnInitializedConnection(multiplexedChannel, promise)) {
                 return promise;
             }
         }
@@ -114,6 +116,19 @@ public class Http2MultiplexedChannelPool implements ChannelPool {
         // No available streams on existing connections, establish new connection and add it to list
         acquireStreamOnNewConnection(promise);
         return promise;
+    }
+
+    /**
+     * Validate that the provided connection seems healthy. If so, return true. If not, release it and return false.
+     */
+    private boolean connectionIsHealthy(MultiplexedChannelRecord multiplexedChannel) {
+        Channel parentChannel = multiplexedChannel.getConnection();
+        if (parentChannel.isActive()) {
+            return true;
+        } else {
+            parentChannel.pipeline().fireExceptionCaught(new ClosedChannelException());
+            return false;
+        }
     }
 
     private void acquireStreamOnNewConnection(Promise<Channel> promise) {
@@ -168,23 +183,32 @@ public class Http2MultiplexedChannelPool implements ChannelPool {
                     return;
                 }
 
-                // Before we cache the connection, make sure that exceptions on the connection will remove it from the cache.
-                parentChannel.pipeline().addLast(new ReleaseOnExceptionHandler());
-
-                connections.add(multiplexedChannel);
-
-                if (closed.get()) {
-                    // Whoops, we were closed while we were setting up. Make sure everything here is cleaned up properly.
-                    failAndCloseParent(promise, parentChannel,
-                                       new IOException("Connection pool was closed while creating a new stream."));
-                    return;
-                }
-
-                promise.setSuccess(streamPromise.getNow());
+                Channel stream = streamPromise.getNow();
+                cacheConnectionForFutureStreams(stream, multiplexedChannel, promise);
             });
         } catch (Throwable e) {
             failAndCloseParent(promise, parentChannel, e);
         }
+    }
+
+    private void cacheConnectionForFutureStreams(Channel stream,
+                                                 MultiplexedChannelRecord multiplexedChannel,
+                                                 Promise<Channel> promise) {
+        Channel parentChannel = stream.parent();
+
+        // Before we cache the connection, make sure that exceptions on the connection will remove it from the cache.
+        parentChannel.pipeline().addLast(new ReleaseOnExceptionHandler());
+
+        connections.add(multiplexedChannel);
+
+        if (closed.get()) {
+            // Whoops, we were closed while we were setting up. Make sure everything here is cleaned up properly.
+            failAndCloseParent(promise, parentChannel,
+                               new IOException("Connection pool was closed while creating a new stream."));
+            return;
+        }
+
+        promise.setSuccess(stream);
     }
 
     private Void failAndCloseParent(Promise<Channel> promise, Channel parentChannel, Throwable exception) {
