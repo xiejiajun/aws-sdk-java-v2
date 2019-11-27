@@ -154,22 +154,34 @@ public class Http2MultiplexedChannelPool implements ChannelPool {
             MultiplexedChannelRecord multiplexedChannel = new MultiplexedChannelRecord(parentChannel, maxStreams);
             parentChannel.attr(MULTIPLEXED_CHANNEL).set(multiplexedChannel);
 
-            if (!acquireStreamOnInitializedConnection(multiplexedChannel, promise)) {
+            Promise<Channel> streamPromise = parentChannel.eventLoop().newPromise();
+
+            if (!acquireStreamOnInitializedConnection(multiplexedChannel, streamPromise)) {
                 failAndCloseParent(promise, parentChannel,
                                    new IOException("Connection was closed while creating a new stream."));
                 return;
             }
 
-            // Before we cache the connection, make sure that exceptions on the connection will remove it from the cache.
-            parentChannel.pipeline().addLast(new ReleaseOnExceptionHandler());
+            streamPromise.addListener(f -> {
+                if (!streamPromise.isSuccess()) {
+                    promise.setFailure(streamPromise.cause());
+                    return;
+                }
 
-            connections.add(multiplexedChannel);
+                // Before we cache the connection, make sure that exceptions on the connection will remove it from the cache.
+                parentChannel.pipeline().addLast(new ReleaseOnExceptionHandler());
 
-            if (closed.get()) {
-                // Whoops, we were closed while we were setting up. Make sure everything here is cleaned up properly.
-                failAndCloseParent(promise, parentChannel,
-                                   new IOException("Connection pool was closed while creating a new stream."));
-            }
+                connections.add(multiplexedChannel);
+
+                if (closed.get()) {
+                    // Whoops, we were closed while we were setting up. Make sure everything here is cleaned up properly.
+                    failAndCloseParent(promise, parentChannel,
+                                       new IOException("Connection pool was closed while creating a new stream."));
+                    return;
+                }
+
+                promise.setSuccess(streamPromise.getNow());
+            });
         } catch (Throwable e) {
             failAndCloseParent(promise, parentChannel, e);
         }
