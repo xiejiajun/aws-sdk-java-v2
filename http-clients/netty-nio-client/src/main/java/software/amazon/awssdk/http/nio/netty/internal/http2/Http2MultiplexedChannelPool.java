@@ -126,7 +126,7 @@ public class Http2MultiplexedChannelPool implements ChannelPool {
         if (parentChannel.isActive()) {
             return true;
         } else {
-            parentChannel.pipeline().fireExceptionCaught(new ClosedChannelException());
+            closeAndReleaseParent(parentChannel, new ClosedChannelException());
             return false;
         }
     }
