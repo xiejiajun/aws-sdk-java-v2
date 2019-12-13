@@ -37,9 +37,7 @@ import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpVersion;
-import io.netty.handler.timeout.ReadTimeoutException;
 import io.netty.handler.timeout.ReadTimeoutHandler;
-import io.netty.handler.timeout.WriteTimeoutException;
 import io.netty.handler.timeout.WriteTimeoutHandler;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
@@ -47,12 +45,10 @@ import io.netty.util.concurrent.Promise;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.ByteBuffer;
-import java.nio.channels.ClosedChannelException;
 import java.time.Duration;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Supplier;
 import org.reactivestreams.Publisher;
@@ -65,6 +61,7 @@ import software.amazon.awssdk.http.Protocol;
 import software.amazon.awssdk.http.nio.netty.internal.http2.Http2ToHttpInboundAdapter;
 import software.amazon.awssdk.http.nio.netty.internal.http2.HttpToHttp2OutboundAdapter;
 import software.amazon.awssdk.http.nio.netty.internal.utils.ChannelUtils;
+import software.amazon.awssdk.http.nio.netty.internal.utils.FailureUtils;
 
 @SdkInternalApi
 public final class NettyRequestExecutor {
@@ -105,6 +102,8 @@ public final class NettyRequestExecutor {
             if (t == null) {
                 return;
             }
+
+            FailureUtils.runAndLogIfFails(() -> context.handler().onError(t), () -> "'onError' raised unexpected exception.");
 
             if (!channelPromise.tryFailure(t)) {
                 // Couldn't fail promise, it's already done
@@ -259,84 +258,7 @@ public final class NettyRequestExecutor {
 
     private void handleFailure(Supplier<String> msg, Throwable cause) {
         log.debug(msg.get(), cause);
-        cause = decorateException(cause);
-        context.handler().onError(cause);
-        executeFuture.completeExceptionally(cause);
-    }
-
-    private Throwable decorateException(Throwable originalCause) {
-        if (isAcquireTimeoutException(originalCause)) {
-            return new Throwable(getMessageForAcquireTimeoutException(), originalCause);
-        } else if (isTooManyPendingAcquiresException(originalCause)) {
-            return new Throwable(getMessageForTooManyAcquireOperationsError(), originalCause);
-        } else if (originalCause instanceof ReadTimeoutException) {
-            return new IOException("Read timed out", originalCause);
-        } else if (originalCause instanceof WriteTimeoutException) {
-            return new IOException("Write timed out", originalCause);
-        } else if (originalCause instanceof ClosedChannelException) {
-            return new IOException(getMessageForClosedChannel(), originalCause);
-        }
-
-        return originalCause;
-    }
-
-    private boolean isAcquireTimeoutException(Throwable originalCause) {
-        String message = originalCause.getMessage();
-        return originalCause instanceof TimeoutException &&
-                message != null &&
-                message.contains("Acquire operation took longer");
-    }
-
-    private boolean isTooManyPendingAcquiresException(Throwable originalCause) {
-        String message = originalCause.getMessage();
-        return originalCause instanceof IllegalStateException &&
-               message != null &&
-               originalCause.getMessage().contains("Too many outstanding acquire operations");
-    }
-
-    private String getMessageForAcquireTimeoutException() {
-        return "Acquire operation took longer than the configured maximum time. This indicates that a request cannot get a "
-                + "connection from the pool within the specified maximum time. This can be due to high request rate.\n"
-
-                + "Consider taking any of the following actions to mitigate the issue: increase max connections, "
-                + "increase acquire timeout, or slowing the request rate.\n"
-
-                + "Increasing the max connections can increase client throughput (unless the network interface is already "
-                + "fully utilized), but can eventually start to hit operation system limitations on the number of file "
-                + "descriptors used by the process. If you already are fully utilizing your network interface or cannot "
-                + "further increase your connection count, increasing the acquire timeout gives extra time for requests to "
-                + "acquire a connection before timing out. If the connections doesn't free up, the subsequent requests "
-                + "will still timeout.\n"
-
-                + "If the above mechanisms are not able to fix the issue, try smoothing out your requests so that large "
-                + "traffic bursts cannot overload the client, being more efficient with the number of times you need to "
-                + "call AWS, or by increasing the number of hosts sending requests.";
-    }
-
-    private String getMessageForTooManyAcquireOperationsError() {
-        return "Maximum pending connection acquisitions exceeded. The request rate is too high for the client to keep up.\n"
-
-                + "Consider taking any of the following actions to mitigate the issue: increase max connections, "
-                + "increase max pending acquire count, decrease pool lease timeout, or slowing the request rate.\n"
-
-                + "Increasing the max connections can increase client throughput (unless the network interface is already "
-                + "fully utilized), but can eventually start to hit operation system limitations on the number of file "
-                + "descriptors used by the process. If you already are fully utilizing your network interface or cannot "
-                + "further increase your connection count, increasing the pending acquire count allows extra requests to be "
-                + "buffered by the client, but can cause additional request latency and higher memory usage. If your request"
-                + " latency or memory usage is already too high, decreasing the lease timeout will allow requests to fail "
-                + "more quickly, reducing the number of pending connection acquisitions, but likely won't decrease the total "
-                + "number of failed requests.\n"
-
-                + "If the above mechanisms are not able to fix the issue, try smoothing out your requests so that large "
-                + "traffic bursts cannot overload the client, being more efficient with the number of times you need to call "
-                + "AWS, or by increasing the number of hosts sending requests.";
-    }
-
-    private String getMessageForClosedChannel() {
-        return "The channel was closed. This may have been done by the client (e.g. because the request was aborted), " +
-               "by the service (e.g. because the request took too long or the client tried to write on a read-only socket), " +
-               "or by an intermediary party (e.g. because the channel was idle for too long).";
+        FailureUtils.failRequestFuture(executeFuture, cause);
     }
 
     /**

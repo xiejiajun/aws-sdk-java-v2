@@ -54,6 +54,9 @@ public final class ChannelAttributeKey {
     public static final AttributeKey<Long> MAX_CONCURRENT_STREAMS = AttributeKey.newInstance(
         "aws.http.nio.netty.async.maxConcurrentStreams");
 
+    public static final AttributeKey<CompletableFuture<Void>> EXECUTE_FUTURE_KEY = AttributeKey.newInstance(
+        "aws.http.nio.netty.async.executeFuture");
+
     /**
      * {@link AttributeKey} to keep track of whether we should close the connection after this request
      * has completed.
@@ -77,9 +80,6 @@ public final class ChannelAttributeKey {
      */
     static final AttributeKey<Boolean> LAST_HTTP_CONTENT_RECEIVED_KEY = AttributeKey.newInstance(
         "aws.http.nio.netty.async.lastHttpContentReceived");
-
-    static final AttributeKey<CompletableFuture<Void>> EXECUTE_FUTURE_KEY = AttributeKey.newInstance(
-            "aws.http.nio.netty.async.executeFuture");
 
     static final AttributeKey<Long> EXECUTION_ID_KEY = AttributeKey.newInstance(
             "aws.http.nio.netty.async.executionId");
