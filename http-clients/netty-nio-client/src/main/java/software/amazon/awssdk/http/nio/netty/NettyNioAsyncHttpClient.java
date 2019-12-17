@@ -77,6 +77,7 @@ public final class NettyNioAsyncHttpClient implements SdkAsyncHttpClient {
 
     private static final Logger log = LoggerFactory.getLogger(NettyNioAsyncHttpClient.class);
     private static final long MAX_STREAMS_ALLOWED = 4294967295L; // unsigned 32-bit, 2^32 -1
+    private static final int DEFAULT_INITIAL_WINDOW_SIZE = 1_048_576; // 1MiB
 
     // Override connection idle timeout for Netty http client to reduce the frequency of "server failed to complete the
     // response error". see https://github.com/aws/aws-sdk-java-v2/issues/1122
@@ -92,12 +93,14 @@ public final class NettyNioAsyncHttpClient implements SdkAsyncHttpClient {
         this.configuration = new NettyConfiguration(serviceDefaultsMap);
         Protocol protocol = serviceDefaultsMap.get(SdkHttpConfigurationOption.PROTOCOL);
         long maxStreams = builder.maxHttp2Streams == null ? MAX_STREAMS_ALLOWED : builder.maxHttp2Streams;
+        int initialWindowSize = builder.initialWindowSize == null ? DEFAULT_INITIAL_WINDOW_SIZE : builder.initialWindowSize;
         this.sdkEventLoopGroup = eventLoopGroup(builder);
         this.pools = AwaitCloseChannelPoolMap.builder()
                                              .sdkChannelOptions(builder.sdkChannelOptions)
                                              .configuration(configuration)
                                              .protocol(protocol)
                                              .maxStreams(maxStreams)
+                                             .initialWindowSize(initialWindowSize)
                                              .sdkEventLoopGroup(sdkEventLoopGroup)
                                              .sslProvider(resolveSslProvider(builder))
                                              .proxyConfiguration(builder.proxyConfiguration)
@@ -380,6 +383,17 @@ public final class NettyNioAsyncHttpClient implements SdkAsyncHttpClient {
          * @return The builder for method chaining.
          */
         Builder tlsKeyManagersProvider(TlsKeyManagersProvider keyManagersProvider);
+
+        /**
+         * Sets initial window size of a stream. This setting is only respected when the HTTP/2 protocol is used.
+         *
+         * See <a href="https://tools.ietf.org/html/rfc7540#section-6.5.2">https://tools.ietf.org/html/rfc7540#section-6.5.2</a>
+         * for more information about this parameter.
+         *
+         * @param initialWindowSize The initial window size of a stream.
+         * @return This builder for method chaining.
+         */
+        Builder initialWindowSize(Integer initialWindowSize);
     }
 
     /**
@@ -394,6 +408,7 @@ public final class NettyNioAsyncHttpClient implements SdkAsyncHttpClient {
         private SdkEventLoopGroup eventLoopGroup;
         private SdkEventLoopGroup.Builder eventLoopGroupBuilder;
         private Integer maxHttp2Streams;
+        private Integer initialWindowSize;
         private SslProvider sslProvider;
         private ProxyConfiguration proxyConfiguration;
 
@@ -566,6 +581,19 @@ public final class NettyNioAsyncHttpClient implements SdkAsyncHttpClient {
         public Builder tlsKeyManagersProvider(TlsKeyManagersProvider tlsKeyManagersProvider) {
             this.standardOptions.put(TLS_KEY_MANAGERS_PROVIDER, tlsKeyManagersProvider);
             return this;
+        }
+
+        @Override
+        public Builder initialWindowSize(Integer initialWindowSize) {
+            if (initialWindowSize != null) {
+                Validate.isPositive(initialWindowSize, "initialWindowSize");
+            }
+            this.initialWindowSize = initialWindowSize;
+            return this;
+        }
+
+        public void setInitialWindowSize(Integer initialWindowSize) {
+            initialWindowSize(initialWindowSize);
         }
 
         @Override
