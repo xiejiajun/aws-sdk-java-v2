@@ -28,7 +28,7 @@ import org.reactivestreams.Publisher;
 import org.reactivestreams.tck.PublisherVerification;
 import org.reactivestreams.tck.TestEnvironment;
 import org.testng.annotations.BeforeMethod;
-import software.amazon.awssdk.http.nio.netty.internal.utils.ExecutionResult;
+import software.amazon.awssdk.http.nio.netty.internal.utils.ExceptionConvertingCompletableFuture;
 
 /**
  * TCK verification test for {@link software.amazon.awssdk.http.nio.netty.internal.ResponseHandler.FullResponseContentPublisher}.
@@ -36,7 +36,7 @@ import software.amazon.awssdk.http.nio.netty.internal.utils.ExecutionResult;
 public class FullResponseContentPublisherTckTest extends PublisherVerification<ByteBuffer> {
     private static final byte[] CONTENT = new byte[16];
 
-    private ExecutionResult executionResult;
+    private ExceptionConvertingCompletableFuture completableFuture;
 
     private ChannelHandlerContext mockCtx = mock(ChannelHandlerContext.class);
 
@@ -46,7 +46,7 @@ public class FullResponseContentPublisherTckTest extends PublisherVerification<B
         Channel chan = mock(Channel.class);
         when(mockCtx.channel()).thenReturn(chan);
         when(chan.attr(any(AttributeKey.class))).thenReturn(mock(Attribute.class));
-        executionResult = ExecutionResult.create();
+        completableFuture = ExceptionConvertingCompletableFuture.create();
     }
 
     public FullResponseContentPublisherTckTest() {
@@ -61,7 +61,7 @@ public class FullResponseContentPublisherTckTest extends PublisherVerification<B
 
     @Override
     public Publisher<ByteBuffer> createPublisher(long l) {
-        return new ResponseHandler.FullResponseContentPublisher(mockCtx, ByteBuffer.wrap(CONTENT), executionResult);
+        return new ResponseHandler.FullResponseContentPublisher(mockCtx, ByteBuffer.wrap(CONTENT), completableFuture);
     }
 
     @Override

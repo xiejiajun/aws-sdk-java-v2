@@ -63,7 +63,7 @@ import software.amazon.awssdk.http.Protocol;
 import software.amazon.awssdk.http.nio.netty.internal.http2.Http2ToHttpInboundAdapter;
 import software.amazon.awssdk.http.nio.netty.internal.http2.HttpToHttp2OutboundAdapter;
 import software.amazon.awssdk.http.nio.netty.internal.utils.ChannelUtils;
-import software.amazon.awssdk.http.nio.netty.internal.utils.ExecutionResult;
+import software.amazon.awssdk.http.nio.netty.internal.utils.ExceptionConvertingCompletableFuture;
 
 @SdkInternalApi
 public final class NettyRequestExecutor {
@@ -73,7 +73,7 @@ public final class NettyRequestExecutor {
     private static final AtomicLong EXECUTION_COUNTER = new AtomicLong(0L);
     private final long executionId = EXECUTION_COUNTER.incrementAndGet();
     private final RequestContext context;
-    private ExecutionResult executionResult;
+    private ExceptionConvertingCompletableFuture completableFuture;
     private Channel channel;
     private RequestAdapter requestAdapter;
 
@@ -85,9 +85,9 @@ public final class NettyRequestExecutor {
     public CompletableFuture<Void> execute() {
         Promise<Channel> channelFuture = context.eventLoopGroup().next().newPromise();
         context.channelPool().acquire(channelFuture);
-        executionResult = createExecuteResult(channelFuture);
+        completableFuture = createConvertingCompletableFuture(channelFuture);
         channelFuture.addListener((GenericFutureListener) this::makeRequestListener);
-        return executionResult.outputFuture();
+        return completableFuture.outputFuture();
     }
 
     /**
@@ -97,11 +97,11 @@ public final class NettyRequestExecutor {
      *
      * @return The created execution future.
      */
-    private ExecutionResult createExecuteResult(Promise<Channel> channelPromise) {
-        return ExecutionResult.builder()
-                              .addFailureListener(t -> context.handler().onError(t))
-                              .addFailureListener(t -> closeChannel(channelPromise, context.channelPool(), t))
-                              .build();
+    private ExceptionConvertingCompletableFuture createConvertingCompletableFuture(Promise<Channel> channelPromise) {
+        return ExceptionConvertingCompletableFuture.builder()
+                                                   .addFailureListener(t -> context.handler().onError(t))
+                                                   .addFailureListener(t -> closeChannel(channelPromise, context.channelPool(), t))
+                                                   .build();
     }
 
     private void closeChannel(Promise<Channel> channelPromise, ChannelPool channelPool, Throwable cause) {
@@ -141,7 +141,7 @@ public final class NettyRequestExecutor {
 
     private void configureChannel() {
         channel.attr(EXECUTION_ID_KEY).set(executionId);
-        channel.attr(EXECUTION_RESULT).set(executionResult);
+        channel.attr(EXECUTION_RESULT).set(completableFuture);
         channel.attr(REQUEST_CONTEXT_KEY).set(context);
         channel.attr(RESPONSE_COMPLETE_KEY).set(false);
         channel.attr(LAST_HTTP_CONTENT_RECEIVED_KEY).set(false);
@@ -257,7 +257,7 @@ public final class NettyRequestExecutor {
 
     private void handleFailure(Supplier<String> msg, Throwable cause) {
         log.debug(msg.get(), cause);
-        executionResult.tryFailExecution(cause);
+        completableFuture.tryFailExecution(cause);
     }
 
     /**

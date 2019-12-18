@@ -56,7 +56,7 @@ import software.amazon.awssdk.http.SdkCancellationException;
 import software.amazon.awssdk.http.SdkHttpFullResponse;
 import software.amazon.awssdk.http.SdkHttpResponse;
 import software.amazon.awssdk.http.nio.netty.internal.http2.Http2ResetSendingSubscription;
-import software.amazon.awssdk.http.nio.netty.internal.utils.ExecutionResult;
+import software.amazon.awssdk.http.nio.netty.internal.utils.ExceptionConvertingCompletableFuture;
 import software.amazon.awssdk.utils.async.DelegatingSubscription;
 
 @Sharable
@@ -85,7 +85,7 @@ public class ResponseHandler extends SimpleChannelInboundHandler<HttpObject> {
             requestContext.handler().onHeaders(sdkResponse);
         }
 
-        ExecutionResult ef = executionResult(channelContext);
+        ExceptionConvertingCompletableFuture ef = executionResult(channelContext);
         if (msg instanceof StreamedHttpResponse) {
             requestContext.handler().onStream(
                     new PublisherAdapter((StreamedHttpResponse) msg, channelContext, requestContext, ef));
@@ -167,7 +167,7 @@ public class ResponseHandler extends SimpleChannelInboundHandler<HttpObject> {
         return bb;
     }
 
-    private static ExecutionResult executionResult(ChannelHandlerContext ctx) {
+    private static ExceptionConvertingCompletableFuture executionResult(ChannelHandlerContext ctx) {
         return ctx.channel().attr(EXECUTION_RESULT).get();
     }
 
@@ -175,15 +175,15 @@ public class ResponseHandler extends SimpleChannelInboundHandler<HttpObject> {
         private final StreamedHttpResponse response;
         private final ChannelHandlerContext channelContext;
         private final RequestContext requestContext;
-        private final ExecutionResult executionResult;
+        private final ExceptionConvertingCompletableFuture completableFuture;
         private final AtomicBoolean isDone = new AtomicBoolean(false);
 
         PublisherAdapter(StreamedHttpResponse response, ChannelHandlerContext channelContext,
-                         RequestContext requestContext, ExecutionResult executionResult) {
+                         RequestContext requestContext, ExceptionConvertingCompletableFuture completableFuture) {
             this.response = response;
             this.channelContext = channelContext;
             this.requestContext = requestContext;
-            this.executionResult = executionResult;
+            this.completableFuture = completableFuture;
         }
 
         @Override
@@ -212,7 +212,7 @@ public class ResponseHandler extends SimpleChannelInboundHandler<HttpObject> {
                         SdkCancellationException e = new SdkCancellationException(
                                 "Subscriber cancelled before all events were published");
                         log.warn("Subscriber cancelled before all events were published");
-                        executionResult.tryFailExecution(e);
+                        completableFuture.tryFailExecution(e);
                     } finally {
                         runAndLogIfFails(() -> closeAndRelease(channelContext), "Could not release channel back to the pool");
                     }
@@ -297,15 +297,15 @@ public class ResponseHandler extends SimpleChannelInboundHandler<HttpObject> {
     static class FullResponseContentPublisher implements Publisher<ByteBuffer> {
         private final ChannelHandlerContext channelContext;
         private final ByteBuffer fullContent;
-        private final ExecutionResult executionResult;
+        private final ExceptionConvertingCompletableFuture completableFuture;
         private boolean running = true;
         private Subscriber<? super ByteBuffer> subscriber;
 
         FullResponseContentPublisher(ChannelHandlerContext channelContext, ByteBuffer fullContent,
-                                     ExecutionResult executionResult) {
+                                     ExceptionConvertingCompletableFuture completableFuture) {
             this.channelContext = channelContext;
             this.fullContent = fullContent;
-            this.executionResult = executionResult;
+            this.completableFuture = completableFuture;
         }
 
         @Override
@@ -328,7 +328,7 @@ public class ResponseHandler extends SimpleChannelInboundHandler<HttpObject> {
                         } else {
                             subscriber.onNext(fullContent);
                             subscriber.onComplete();
-                            executionResult.trySucceedExecution();
+                            completableFuture.trySucceedExecution();
                         }
                     }
                 }

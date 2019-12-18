@@ -1,84 +1,13 @@
-/*
- * Copyright 2010-2019 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License").
- * You may not use this file except in compliance with the License.
- * A copy of the License is located at
- *
- *  http://aws.amazon.com/apache2.0
- *
- * or in the "license" file accompanying this file. This file is distributed
- * on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
- * express or implied. See the License for the specific language governing
- * permissions and limitations under the License.
- */
-
 package software.amazon.awssdk.http.nio.netty.internal.utils;
 
 import io.netty.handler.timeout.ReadTimeoutException;
 import io.netty.handler.timeout.WriteTimeoutException;
 import java.io.IOException;
 import java.nio.channels.ClosedChannelException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeoutException;
-import java.util.function.Consumer;
-import software.amazon.awssdk.annotations.SdkInternalApi;
-import software.amazon.awssdk.utils.Logger;
 
-@SdkInternalApi
-public class ExecutionResult {
-    private static final Logger log = Logger.loggerFor(ExecutionResult.class);
-
-    private final CompletableFuture<Void> inputFuture = new CompletableFuture<>();
-    private final CompletableFuture<Void> outputFuture = new CompletableFuture<>();
-
-    private ExecutionResult(Builder builder) {
-        inputFuture.whenComplete((r, t) -> {
-            if (t != null) {
-                outputFuture.completeExceptionally(decorateException(t));
-            } else {
-                outputFuture.complete(r);
-            }
-        });
-
-        for (Consumer<Throwable> failureListener : builder.failureListeners) {
-            outputFuture.whenComplete((r, t) -> {
-                if (t != null) {
-                    try {
-                        failureListener.accept(t);
-                    } catch (Throwable newT) {
-                        log.error(() -> "Failure listener raised exception while handling exception. "
-                                        + "The raised exception follows.", newT);
-                    }
-                }
-            });
-        }
-    }
-
-    public static Builder builder() {
-        return new Builder();
-    }
-
-    public static ExecutionResult create() {
-        return builder().build();
-    }
-
-    public CompletableFuture<Void> outputFuture() {
-        return outputFuture;
-    }
-
-    public boolean trySucceedExecution() {
-        return inputFuture.complete(null);
-    }
-
-    public boolean tryFailExecution(Throwable cause) {
-        cause = decorateException(cause);
-        return inputFuture.completeExceptionally(cause);
-    }
-
-    private static Throwable decorateException(Throwable originalCause) {
+public class NettyExceptionConverter {
+    public static Throwable convertNettyExceptionIntoHttpClientException(Throwable originalCause) {
         if (isAcquireTimeoutException(originalCause)) {
             return new RuntimeException(getMessageForAcquireTimeoutException(), originalCause);
         } else if (isTooManyPendingAcquiresException(originalCause)) {
@@ -152,20 +81,4 @@ public class ExecutionResult {
                "by the service (e.g. because the request took too long or the client tried to write on a read-only socket), " +
                "or by an intermediary party (e.g. because the channel was idle for too long).";
     }
-
-    public static final class Builder {
-        private final List<Consumer<Throwable>> failureListeners = new ArrayList<>();
-
-        private Builder() {}
-
-        public Builder addFailureListener(Consumer<Throwable> listener) {
-            this.failureListeners.add(listener);
-            return this;
-        }
-
-        public ExecutionResult build() {
-            return new ExecutionResult(this);
-        }
-    }
-
 }

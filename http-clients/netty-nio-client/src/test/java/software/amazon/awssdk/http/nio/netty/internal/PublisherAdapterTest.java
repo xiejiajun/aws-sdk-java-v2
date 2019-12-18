@@ -51,7 +51,7 @@ import org.reactivestreams.Subscription;
 import software.amazon.awssdk.http.Protocol;
 import software.amazon.awssdk.http.async.AsyncExecuteRequest;
 import software.amazon.awssdk.http.async.SdkAsyncHttpResponseHandler;
-import software.amazon.awssdk.http.nio.netty.internal.utils.ExecutionResult;
+import software.amazon.awssdk.http.nio.netty.internal.utils.ExceptionConvertingCompletableFuture;
 
 @RunWith(MockitoJUnitRunner.class)
 public class PublisherAdapterTest {
@@ -74,12 +74,12 @@ public class PublisherAdapterTest {
 
     private RequestContext requestContext;
 
-    private ExecutionResult executionResult;
+    private ExceptionConvertingCompletableFuture completableFuture;
     private ResponseHandler nettyResponseHandler;
 
     @Before
     public void setUp() throws Exception {
-        executionResult = ExecutionResult.create();
+        completableFuture = ExceptionConvertingCompletableFuture.create();
         fullHttpResponse = mock(DefaultHttpContent.class);
 
         when(fullHttpResponse.content()).thenReturn(new EmptyByteBuf(ByteBufAllocator.DEFAULT));
@@ -91,7 +91,7 @@ public class PublisherAdapterTest {
         channel = new MockChannel();
         channel.attr(PROTOCOL_FUTURE).set(CompletableFuture.completedFuture(Protocol.HTTP1_1));
         channel.attr(REQUEST_CONTEXT_KEY).set(requestContext);
-        channel.attr(EXECUTION_RESULT).set(executionResult);
+        channel.attr(EXECUTION_RESULT).set(completableFuture);
         when(ctx.channel()).thenReturn(channel);
 
         nettyResponseHandler = ResponseHandler.getInstance();
@@ -115,7 +115,7 @@ public class PublisherAdapterTest {
         ResponseHandler.PublisherAdapter publisherAdapter = new ResponseHandler.PublisherAdapter(streamedHttpResponse,
                                                                                                  ctx,
                                                                                                  requestContext,
-                                                                                                 executionResult
+                                                                                                 completableFuture
         );
         TestSubscriber subscriber = new TestSubscriber();
 
@@ -125,8 +125,8 @@ public class PublisherAdapterTest {
         verify(ctx, times(0)).close();
         assertThat(subscriber.isCompleted).isEqualTo(true);
         verify(channelPool).release(channel);
-        executionResult.outputFuture().join();
-        assertThat(executionResult.outputFuture()).isCompleted();
+        completableFuture.outputFuture().join();
+        assertThat(completableFuture.outputFuture()).isCompleted();
     }
 
     @Test
@@ -143,7 +143,7 @@ public class PublisherAdapterTest {
         ResponseHandler.PublisherAdapter publisherAdapter = new ResponseHandler.PublisherAdapter(streamedHttpResponse,
                                                                                                  ctx,
                                                                                                  requestContext,
-                                                                                                 executionResult
+                                                                                                 completableFuture
         );
         TestSubscriber subscriber = new TestSubscriber();
 
@@ -153,7 +153,7 @@ public class PublisherAdapterTest {
         verify(ctx).close();
         assertThat(subscriber.errorOccurred).isTrue();
         verify(channelPool).release(channel);
-        assertThat(executionResult.outputFuture()).isCompletedExceptionally();
+        assertThat(completableFuture.outputFuture()).isCompletedExceptionally();
         verify(responseHandler).onError(exception);
     }
 

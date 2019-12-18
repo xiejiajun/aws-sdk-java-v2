@@ -10,7 +10,7 @@ import org.mockito.Mockito;
 import org.mockito.internal.verification.Times;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
-import software.amazon.awssdk.http.nio.netty.internal.utils.ExecutionResult;
+import software.amazon.awssdk.http.nio.netty.internal.utils.ExceptionConvertingCompletableFuture;
 
 public class UnusedChannelExceptionHandlerTest {
     private Throwable exception = new Throwable();
@@ -19,7 +19,7 @@ public class UnusedChannelExceptionHandlerTest {
     private ChannelHandlerContext ctx;
     private Channel channel;
     private Attribute<Boolean> inUseAttribute;
-    private Attribute<ExecutionResult> futureAttribute;
+    private Attribute<ExceptionConvertingCompletableFuture> futureAttribute;
 
     @BeforeMethod
     @SuppressWarnings("unchecked")
@@ -62,7 +62,7 @@ public class UnusedChannelExceptionHandlerTest {
 
 
     private void notInUseCloses(Throwable exception) {
-        ExecutionResult result = ExecutionResult.create();
+        ExceptionConvertingCompletableFuture result = ExceptionConvertingCompletableFuture.create();
         result.trySucceedExecution();
 
         Mockito.when(inUseAttribute.get()).thenReturn(false);
@@ -75,7 +75,7 @@ public class UnusedChannelExceptionHandlerTest {
 
     @Test
     public void notInUseFutureCompletes() {
-        ExecutionResult result = ExecutionResult.create();
+        ExceptionConvertingCompletableFuture result = ExceptionConvertingCompletableFuture.create();
 
         Mockito.when(inUseAttribute.get()).thenReturn(false);
         Mockito.when(futureAttribute.get()).thenReturn(result);

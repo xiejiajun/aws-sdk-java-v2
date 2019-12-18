@@ -24,7 +24,7 @@ import io.netty.handler.timeout.TimeoutException;
 import java.io.IOException;
 import java.util.Optional;
 import software.amazon.awssdk.annotations.SdkInternalApi;
-import software.amazon.awssdk.http.nio.netty.internal.utils.ExecutionResult;
+import software.amazon.awssdk.http.nio.netty.internal.utils.ExceptionConvertingCompletableFuture;
 import software.amazon.awssdk.utils.Logger;
 
 /**
@@ -53,7 +53,7 @@ public final class UnusedChannelExceptionHandler extends ChannelInboundHandlerAd
         } else {
             ctx.close();
 
-            Optional<ExecutionResult> executeFuture = getAttribute(ctx.channel(), ChannelAttributeKey.EXECUTION_RESULT);
+            Optional<ExceptionConvertingCompletableFuture> executeFuture = getAttribute(ctx.channel(), ChannelAttributeKey.EXECUTION_RESULT);
 
             if (executeFuture.isPresent() && executeFuture.get().tryFailExecution(cause)) {
                 log.error(() -> "An exception occurred on an channel (" + ctx.channel().id() + ") that was not in use, " +
