@@ -6,11 +6,11 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.util.Attribute;
 import java.io.IOException;
-import java.util.concurrent.CompletableFuture;
 import org.mockito.Mockito;
 import org.mockito.internal.verification.Times;
 import org.testng.annotations.BeforeMethod;
 import org.testng.annotations.Test;
+import software.amazon.awssdk.http.nio.netty.internal.utils.ExecutionResult;
 
 public class UnusedChannelExceptionHandlerTest {
     private Throwable exception = new Throwable();
@@ -19,7 +19,7 @@ public class UnusedChannelExceptionHandlerTest {
     private ChannelHandlerContext ctx;
     private Channel channel;
     private Attribute<Boolean> inUseAttribute;
-    private Attribute<CompletableFuture<Void>> futureAttribute;
+    private Attribute<ExecutionResult> futureAttribute;
 
     @BeforeMethod
     @SuppressWarnings("unchecked")
@@ -32,7 +32,7 @@ public class UnusedChannelExceptionHandlerTest {
 
         Mockito.when(ctx.channel()).thenReturn(channel);
         Mockito.when(channel.attr(ChannelAttributeKey.IN_USE)).thenReturn(inUseAttribute);
-        Mockito.when(channel.attr(ChannelAttributeKey.EXECUTE_FUTURE_KEY)).thenReturn(futureAttribute);
+        Mockito.when(channel.attr(ChannelAttributeKey.EXECUTION_RESULT)).thenReturn(futureAttribute);
     }
 
     @Test
@@ -62,8 +62,11 @@ public class UnusedChannelExceptionHandlerTest {
 
 
     private void notInUseCloses(Throwable exception) {
+        ExecutionResult result = ExecutionResult.create();
+        result.trySucceedExecution();
+
         Mockito.when(inUseAttribute.get()).thenReturn(false);
-        Mockito.when(futureAttribute.get()).thenReturn(CompletableFuture.completedFuture(null));
+        Mockito.when(futureAttribute.get()).thenReturn(result);
 
         UnusedChannelExceptionHandler.getInstance().exceptionCaught(ctx, exception);
 
@@ -72,14 +75,14 @@ public class UnusedChannelExceptionHandlerTest {
 
     @Test
     public void notInUseFutureCompletes() {
-        CompletableFuture<Void> incompleteFuture = new CompletableFuture<>();
+        ExecutionResult result = ExecutionResult.create();
 
         Mockito.when(inUseAttribute.get()).thenReturn(false);
-        Mockito.when(futureAttribute.get()).thenReturn(incompleteFuture);
+        Mockito.when(futureAttribute.get()).thenReturn(result);
 
         UnusedChannelExceptionHandler.getInstance().exceptionCaught(ctx, exception);
 
         Mockito.verify(ctx).close();
-        assertThat(incompleteFuture.isDone()).isTrue();
+        assertThat(result.outputFuture().isDone()).isTrue();
     }
 }

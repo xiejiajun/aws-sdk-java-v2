@@ -15,13 +15,14 @@
 
 package software.amazon.awssdk.http.nio.netty.internal;
 
-import static software.amazon.awssdk.http.nio.netty.internal.ChannelAttributeKey.EXECUTE_FUTURE_KEY;
 import static software.amazon.awssdk.http.nio.netty.internal.ChannelAttributeKey.EXECUTION_ID_KEY;
+import static software.amazon.awssdk.http.nio.netty.internal.ChannelAttributeKey.EXECUTION_RESULT;
 import static software.amazon.awssdk.http.nio.netty.internal.ChannelAttributeKey.IN_USE;
 import static software.amazon.awssdk.http.nio.netty.internal.ChannelAttributeKey.KEEP_ALIVE;
 import static software.amazon.awssdk.http.nio.netty.internal.ChannelAttributeKey.LAST_HTTP_CONTENT_RECEIVED_KEY;
 import static software.amazon.awssdk.http.nio.netty.internal.ChannelAttributeKey.REQUEST_CONTEXT_KEY;
 import static software.amazon.awssdk.http.nio.netty.internal.ChannelAttributeKey.RESPONSE_COMPLETE_KEY;
+import static software.amazon.awssdk.http.nio.netty.internal.utils.NettyUtils.doInEventLoop;
 
 import com.typesafe.netty.http.HttpStreamsClientHandler;
 import com.typesafe.netty.http.StreamedHttpRequest;
@@ -30,6 +31,7 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.ChannelPipeline;
+import io.netty.channel.pool.ChannelPool;
 import io.netty.handler.codec.DecoderResult;
 import io.netty.handler.codec.http.DefaultHttpContent;
 import io.netty.handler.codec.http.HttpContent;
@@ -61,7 +63,7 @@ import software.amazon.awssdk.http.Protocol;
 import software.amazon.awssdk.http.nio.netty.internal.http2.Http2ToHttpInboundAdapter;
 import software.amazon.awssdk.http.nio.netty.internal.http2.HttpToHttp2OutboundAdapter;
 import software.amazon.awssdk.http.nio.netty.internal.utils.ChannelUtils;
-import software.amazon.awssdk.http.nio.netty.internal.utils.FailureUtils;
+import software.amazon.awssdk.http.nio.netty.internal.utils.ExecutionResult;
 
 @SdkInternalApi
 public final class NettyRequestExecutor {
@@ -71,7 +73,7 @@ public final class NettyRequestExecutor {
     private static final AtomicLong EXECUTION_COUNTER = new AtomicLong(0L);
     private final long executionId = EXECUTION_COUNTER.incrementAndGet();
     private final RequestContext context;
-    private CompletableFuture<Void> executeFuture;
+    private ExecutionResult executionResult;
     private Channel channel;
     private RequestAdapter requestAdapter;
 
@@ -83,9 +85,9 @@ public final class NettyRequestExecutor {
     public CompletableFuture<Void> execute() {
         Promise<Channel> channelFuture = context.eventLoopGroup().next().newPromise();
         context.channelPool().acquire(channelFuture);
-        executeFuture = createExecuteFuture(channelFuture);
+        executionResult = createExecuteResult(channelFuture);
         channelFuture.addListener((GenericFutureListener) this::makeRequestListener);
-        return executeFuture;
+        return executionResult.outputFuture();
     }
 
     /**
@@ -95,37 +97,34 @@ public final class NettyRequestExecutor {
      *
      * @return The created execution future.
      */
-    private CompletableFuture<Void> createExecuteFuture(Promise<Channel> channelPromise) {
-        CompletableFuture<Void> future = new CompletableFuture<>();
+    private ExecutionResult createExecuteResult(Promise<Channel> channelPromise) {
+        return ExecutionResult.builder()
+                              .addFailureListener(t -> context.handler().onError(t))
+                              .addFailureListener(t -> closeChannel(channelPromise, context.channelPool(), t))
+                              .build();
+    }
 
-        future.whenComplete((r, t) -> {
-            if (t == null) {
-                return;
-            }
+    private void closeChannel(Promise<Channel> channelPromise, ChannelPool channelPool, Throwable cause) {
+        // If the channel isn't done being acquired, we can just cancel the promise.
+        if (channelPromise.tryFailure(cause)) {
+            return;
+        }
 
-            FailureUtils.runAndLogIfFails(() -> context.handler().onError(t), () -> "'onError' raised unexpected exception.");
+        // If the channel is done being acquired, but that process failed, no need to do anything because we don't have a
+        // channel to close.
+        if (!channelPromise.isSuccess()) {
+            return;
+        }
 
-            if (!channelPromise.tryFailure(t)) {
-                // Couldn't fail promise, it's already done
-                if (!channelPromise.isSuccess()) {
-                    return;
-                }
-                Channel ch = channelPromise.getNow();
-                try {
-                    ch.eventLoop().submit(() -> {
-                        if (ch.attr(IN_USE).get()) {
-                            ch.pipeline().fireExceptionCaught(new FutureCancelledException(executionId, t));
-                        } else {
-                            ch.close().addListener(closeFuture -> context.channelPool().release(ch));
-                        }
-                    });
-                } catch (Throwable exc) {
-                    log.warn("Unable to add a task to cancel the request to channel's EventLoop", exc);
-                }
+        // We actually have a channel to close. Fire an exception if the channel is in use, otherwise just close and release it.
+        Channel ch = channelPromise.getNow();
+        doInEventLoop(ch.eventLoop(), () -> {
+            if (ch.attr(IN_USE).get()) {
+                ch.pipeline().fireExceptionCaught(new FutureCancelledException(executionId, cause));
+            } else {
+                ch.close().addListener(closeFuture -> channelPool.release(ch));
             }
         });
-
-        return future;
     }
 
     private void makeRequestListener(Future<Channel> channelFuture) {
@@ -142,7 +141,7 @@ public final class NettyRequestExecutor {
 
     private void configureChannel() {
         channel.attr(EXECUTION_ID_KEY).set(executionId);
-        channel.attr(EXECUTE_FUTURE_KEY).set(executeFuture);
+        channel.attr(EXECUTION_RESULT).set(executionResult);
         channel.attr(REQUEST_CONTEXT_KEY).set(context);
         channel.attr(RESPONSE_COMPLETE_KEY).set(false);
         channel.attr(LAST_HTTP_CONTENT_RECEIVED_KEY).set(false);
@@ -258,7 +257,7 @@ public final class NettyRequestExecutor {
 
     private void handleFailure(Supplier<String> msg, Throwable cause) {
         log.debug(msg.get(), cause);
-        FailureUtils.failRequestFuture(executeFuture, cause);
+        executionResult.tryFailExecution(cause);
     }
 
     /**

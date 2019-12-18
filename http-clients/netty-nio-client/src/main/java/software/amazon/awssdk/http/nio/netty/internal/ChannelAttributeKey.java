@@ -25,6 +25,7 @@ import software.amazon.awssdk.annotations.SdkInternalApi;
 import software.amazon.awssdk.http.Protocol;
 import software.amazon.awssdk.http.nio.netty.internal.http2.Http2MultiplexedChannelPool;
 import software.amazon.awssdk.http.nio.netty.internal.http2.PingTracker;
+import software.amazon.awssdk.http.nio.netty.internal.utils.ExecutionResult;
 
 /**
  * Keys for attributes attached via {@link io.netty.channel.Channel#attr(AttributeKey)}.
@@ -54,8 +55,8 @@ public final class ChannelAttributeKey {
     public static final AttributeKey<Long> MAX_CONCURRENT_STREAMS = AttributeKey.newInstance(
         "aws.http.nio.netty.async.maxConcurrentStreams");
 
-    public static final AttributeKey<CompletableFuture<Void>> EXECUTE_FUTURE_KEY = AttributeKey.newInstance(
-        "aws.http.nio.netty.async.executeFuture");
+    public static final AttributeKey<ExecutionResult> EXECUTION_RESULT = AttributeKey.newInstance(
+        "aws.http.nio.netty.async.executionResult");
 
     /**
      * {@link AttributeKey} to keep track of whether we should close the connection after this request

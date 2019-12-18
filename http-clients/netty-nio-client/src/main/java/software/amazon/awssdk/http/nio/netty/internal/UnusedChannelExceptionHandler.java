@@ -23,9 +23,8 @@ import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.handler.timeout.TimeoutException;
 import java.io.IOException;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
 import software.amazon.awssdk.annotations.SdkInternalApi;
-import software.amazon.awssdk.http.nio.netty.internal.utils.FailureUtils;
+import software.amazon.awssdk.http.nio.netty.internal.utils.ExecutionResult;
 import software.amazon.awssdk.utils.Logger;
 
 /**
@@ -54,14 +53,13 @@ public final class UnusedChannelExceptionHandler extends ChannelInboundHandlerAd
         } else {
             ctx.close();
 
-            Optional<CompletableFuture<Void>> executeFuture = getAttribute(ctx.channel(), ChannelAttributeKey.EXECUTE_FUTURE_KEY);
+            Optional<ExecutionResult> executeFuture = getAttribute(ctx.channel(), ChannelAttributeKey.EXECUTION_RESULT);
 
-            if (executeFuture.isPresent() && !executeFuture.get().isDone()) {
+            if (executeFuture.isPresent() && executeFuture.get().tryFailExecution(cause)) {
                 log.error(() -> "An exception occurred on an channel (" + ctx.channel().id() + ") that was not in use, " +
                                 "but was associated with a future that wasn't completed. This indicates a bug in the " +
                                 "Java SDK, where a future was not completed while the channel was in use. The channel has " +
                                 "been closed, and the future will be completed to prevent any ongoing issues.", cause);
-                FailureUtils.failRequestFuture(executeFuture.get(), cause);
             } else if (isNettyIoException(cause) || hasNettyIoExceptionCause(cause)) {
                 log.debug(() -> "An I/O exception (" + cause.getMessage() + ") occurred on a channel (" + ctx.channel().id() +
                                 ") that was not in use. The channel has been closed. This is usually normal.");

@@ -16,6 +16,7 @@
 package software.amazon.awssdk.http.nio.netty.internal;
 
 import static software.amazon.awssdk.http.nio.netty.internal.ChannelAttributeKey.EXECUTION_ID_KEY;
+import static software.amazon.awssdk.http.nio.netty.internal.ChannelAttributeKey.EXECUTION_RESULT;
 import static software.amazon.awssdk.http.nio.netty.internal.ChannelAttributeKey.REQUEST_CONTEXT_KEY;
 
 import io.netty.channel.ChannelHandler;
@@ -23,7 +24,6 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import java.io.IOException;
 import software.amazon.awssdk.annotations.SdkInternalApi;
-import software.amazon.awssdk.http.nio.netty.internal.utils.FailureUtils;
 
 /**
  * Closes the channel if the execution future has been cancelled.
@@ -39,11 +39,10 @@ public final class FutureCancelHandler extends ChannelInboundHandlerAdapter {
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable e) {
         if (cancelled(ctx, e)) {
-            FailureUtils.failRequestFuture(ctx.channel(), e);
-            RequestContext requestContext = ctx.channel().attr(REQUEST_CONTEXT_KEY).get();
+            ctx.channel().attr(EXECUTION_RESULT).get().tryFailExecution(e);
             ctx.fireExceptionCaught(new IOException("Request cancelled"));
             ctx.close();
-            requestContext.channelPool().release(ctx.channel());
+            ctx.channel().attr(REQUEST_CONTEXT_KEY).get().channelPool().release(ctx.channel());
         } else {
             ctx.fireExceptionCaught(e);
         }
