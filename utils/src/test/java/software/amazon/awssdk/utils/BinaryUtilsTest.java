@@ -18,6 +18,7 @@ package software.amazon.awssdk.utils;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 
 import java.nio.ByteBuffer;
@@ -158,5 +159,35 @@ public class BinaryUtilsTest {
         assertFalse(partial1 == partial2);
         assertTrue(partial1.length == 3);
         assertTrue(Arrays.equals(new byte[] {2, 3, 4}, partial1));
+    }
+
+    @Test
+    public void testCopyRemainingBytesFrom_nullBuffer() {
+        assertNull(BinaryUtils.copyRemainingBytesFrom(null));
+    }
+
+    @Test
+    public void testCopyRemainingBytesFrom_noRemainingBytes() {
+        assertEquals(0, BinaryUtils.copyRemainingBytesFrom(ByteBuffer.allocate(0)).length);
+    }
+
+    @Test
+    public void testCopyRemainingBytesFrom_fullBuffer() {
+        ByteBuffer bb = ByteBuffer.allocate(8);
+        bb.putInt(42);
+        bb.putInt(42);
+        bb.flip();
+        assertEquals(8, BinaryUtils.copyRemainingBytesFrom(bb).length);
+    }
+
+    @Test
+    public void testCopyRemainingBytesFrom_partiallyReadBuffer() {
+        ByteBuffer bb = ByteBuffer.allocate(8);
+        bb.putInt(42);
+        bb.putInt(42);
+        bb.flip();
+
+        bb.getInt();
+        assertEquals(4, BinaryUtils.copyRemainingBytesFrom(bb).length);
     }
 }
