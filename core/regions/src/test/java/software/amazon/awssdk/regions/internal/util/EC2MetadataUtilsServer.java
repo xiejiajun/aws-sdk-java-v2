@@ -107,7 +107,6 @@ public class EC2MetadataUtilsServer {
             .startsWith("/latest/meta-data/iam/security-credentials/")) {
 
             outputIamCred(output);
-q
         } else if (path.equals("/latest/dynamic/instance-identity/document")) {
             outputInstanceInfo(output);
 
