@@ -15,6 +15,7 @@
 
 package software.amazon.awssdk.regions;
 
+import java.util.List;
 import software.amazon.awssdk.annotations.SdkPublicApi;
 
 /**
@@ -60,6 +61,13 @@ public interface PartitionMetadata {
      * @return The region regex of this partition.
      */
     String regionRegex();
+
+    /**
+     * Retrieve the partition-specific service configuration of each service currently available in this partition.
+     *
+     * @return The list of partition-specific service metadata for each service in this partition.
+     */
+    List<ServicePartitionMetadata> services();
 
     /**
      * Retrieves the partition metadata for a given partition.
